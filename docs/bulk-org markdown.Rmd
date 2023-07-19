@@ -1,7 +1,7 @@
 ---
 title: "bulk-org"
 author: "Raphael Kubler"
-date: "7/17/2023"
+date: "7/19/2023"
 output:
   rmarkdown::html_document:
    theme: united
@@ -42,6 +42,7 @@ library(tidyr)
 library(biomaRt)
 library(variancePartition)
 library(ggrastr)
+library(kableExtra)
 ```
 
 # Introduction
@@ -184,27 +185,32 @@ volcano_plot(data.frame(res_COiMG), title = 'CO vs COiMg',
 
 ### Top 50 DEGs heatmap
 
-```{r heatmap.top50, echo=TRUE, fig.height = 7, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
-top15.coimg <- c(rownames(results$COiMG[order(results$COiMG$log2FoldChange),][results$COiMG[order(results$COiMG$log2FoldChange),]$padj < 0.05,][1:25,]),
-rownames(results$COiMG[order(results$COiMG$log2FoldChange, decreasing = T),][results$COiMG[order(results$COiMG$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,]))
+```{r heatmap.top50, echo=TRUE, fig.height = 4, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+top50.coimg <- rbind(results$COiMG[order(results$COiMG$log2FoldChange, decreasing = T),][results$COiMG[order(results$COiMG$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,],
+results$COiMG[order(results$COiMG$log2FoldChange, decreasing = F),][results$COiMG[order(results$COiMG$log2FoldChange, decreasing = F),]$padj < 0.05,][1:25,])
 
-ha <- HeatmapAnnotation(
-                        COiMG = meta3$COiMg,
-                        col = list(
-                                    COiMG = c("yes"='tomato','no'='lightblue')))
-ComplexHeatmap::Heatmap(t(scale(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top15.coimg,]))),
+top50.names <- rownames(top50.coimg)
+
+ra2 <- rowAnnotation(
+  COiMG = meta3$COiMg,
+  col = list(
+    COiMG = c("yes"='tomato','no'='lightblue')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+ComplexHeatmap::Heatmap(scale(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names,])),
                         cluster_rows = T,
                         cluster_columns = T,
-                        show_row_dend = F,
-                        show_column_dend = F,
-                        show_row_names = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
                         show_column_names = F,
-                        top_annotation = ha,
-                        row_names_gp = gpar(fontsize=8),
-                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(30),
-                        name = "Z-score expression",
-)
-
+                        left_annotation = ra2,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names,])), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
 ```
 Which genes of the top DEGs are cilia-associated (CBC)?
 ```{r coimg.table, echo=TRUE, message = FALSE, warning=FALSE, eval=TRUE}
@@ -215,7 +221,8 @@ organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','
                                'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
 
 
-knitr::kable(cbind('DEG'=top15.coimg,'Cilia-associated'=top15.coimg %in% organoid$CBC))
+kable(cbind('DEG'=rownames(top50.coimg),'lFC'=round(top50.coimg$log2FoldChange,2),'Cilia-associated'=rownames(top50.coimg) %in% organoid$CBC), format = "html") %>% kable_styling("striped") %>% scroll_box(width = "100%")
+
 ```
 
 ### GO
@@ -383,29 +390,30 @@ COiMg.degs <- all_res$COiMG$DEGs
 
 ### Top 50 DEGs heatmap
 
-```{r ifny.heatmap.top50, echo=TRUE, fig.height = 7, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
-top15.ifng <- c(rownames(results$IFNg[order(results$IFNg$log2FoldChange),][results$IFNg[order(results$IFNg$log2FoldChange),]$padj < 0.05,][1:25,]),
-rownames(results$IFNg[order(results$IFNg$log2FoldChange, decreasing = T),][results$IFNg[order(results$IFNg$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,]))
+```{r ifny.heatmap.top50, echo=TRUE, fig.height = 3, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+top50.ifng <- rbind(results$IFNg[order(results$IFNg$log2FoldChange, decreasing = T),][results$IFNg[order(results$IFNg$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,],
+results$IFNg[order(results$IFNg$log2FoldChange, decreasing = F),][results$IFNg[order(results$IFNg$log2FoldChange, decreasing = F),]$padj < 0.05,][1:25,])
+top50.names2 <- rownames(top50.ifng)
+ra3 <- rowAnnotation(
+  Stimulation = meta3$condition,
+  col = list(
+    Stimulation = c("ctrl"='lightblue','IFNg'='tomato', 'LPS'='darkred')),
+  show_annotation_name = T,
+  show_legend = T)
 
-ha <- HeatmapAnnotation(Condition = meta3$condition,
-                        COiMG = meta3$COiMg,
-                        Line = meta3$Line,
-                        col = list( Condition = c("ctrl" = "lightblue", "IFNg" = "tomato", "LPS" = "darkred"),
-                                    COiMG = c("yes"='darkblue','no'='grey80'),
-                                    Line = c('WTC11'='black','MSN38'='white')))
-ComplexHeatmap::Heatmap(t(scale(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top15.ifng,]))),
+
+ComplexHeatmap::Heatmap(scale(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names2,])),
                         cluster_rows = T,
                         cluster_columns = T,
-                        show_row_dend = F,
-                        show_column_dend = F,
-                        show_row_names = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
                         show_column_names = F,
-                        top_annotation = ha,
-                        row_names_gp = gpar(fontsize=8),
-                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(30),
-                        name = "Z-score expression",
-)
-
+                        left_annotation = ra3,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names2,])), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
 
 ```
 
@@ -418,7 +426,8 @@ organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','
                                'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
 
 
-knitr::kable(cbind('DEG'=top15.ifng,'Cilia-associated'=c(top15.ifng %in% organoid$CBC)))
+kable(cbind('DEG'=rownames(top50.ifng),'lFC'=round(top50.ifng$log2FoldChange,2),'Cilia-associated'=rownames(top50.ifng) %in% organoid$CBC), format = "html") %>% kable_styling("striped") %>% scroll_box(width = "100%")
+
 ```
 
 
@@ -554,4 +563,154 @@ ComplexHeatmap::Heatmap(DEG.enrich,
                         col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
                         name = "log2(q)",
 )
+```
+
+
+# Cell-type marker analysis
+
+Cell-types with only 1 gene found back in our expression data carry principal component expression = 0. 
+
+## Heatmaps of gene & PC expression
+```{r cell.type, echo=TRUE, fig.height = 4, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+cell.types <- as.matrix(readxl::read_xlsx('Typical markers cell types organoids 07182023.xlsx', col_names = F))
+
+
+
+PC.covs <- matrix(ncol=length(cell.types[,1]),nrow=length(colnames(batch.rem3_mod1)))
+colnames(PC.covs) <- cell.types[,1]
+for(i in cell.types[,1]){
+  pca.cov <- prcomp(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% cell.types[cell.types[,1] %in% i,][-1],]))
+  PC.covs[,i] <- pca.cov$x[,1]
+  #if (table(rownames(batch.rem3_mod1) %in% cell.types[cell.types[,1] %in% i,][-1])[[2]] == 1){
+  #  PC.covs[,i] <- t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% cell.types[cell.types[,1] %in% i,][-1],])
+  #}
+}
+rownames(PC.covs) <- colnames(batch.rem3_mod1)
+
+ra4 <- rowAnnotation(
+  Stimulation = meta3$condition,
+  COiMG = meta3$COiMg,
+  col = list(COiMG = c('yes'='black','no'='white'),
+    Stimulation = c("ctrl"='lightblue','IFNg'='tomato', 'LPS'='darkred')),
+  show_annotation_name = T,
+  show_legend = T)
+
+ComplexHeatmap::Heatmap(PC.covs,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ra4,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(PC.covs), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "PC1 expression")
+
+#Let's do that for ctr/ifng and coimg/CO only
+#for control only
+ctr.meta <- meta3[meta3$condition %in% 'ctrl',]
+
+#horizontal
+ctr.ra <- rowAnnotation(
+  COiMG = ctr.meta$COiMg,
+  col = list(
+    COiMG = c("yes"='tomato','no'='lightblue')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+ctr.pca <- PC.covs[meta3$condition %in% 'ctrl',]
+ComplexHeatmap::Heatmap(ctr.pca,
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ctr.ra,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(ctr.pca), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "PC1 expression")
+
+
+ifng.meta <- meta3[!meta3$condition %in% 'LPS',]
+
+#horizontal
+ifng.ra <- rowAnnotation(
+  COiMG = ifng.meta$COiMg,
+  Stimulation = ifng.meta$condition,
+  col = list(COiMG = c('yes'='black','no'='white'),
+    Stimulation = c("ctrl"='lightblue','IFNg'='tomato', 'LPS'='darkred')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+ifng.pca <- PC.covs[!meta3$condition %in% 'LPS',]
+ComplexHeatmap::Heatmap(ifng.pca,
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ifng.ra,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(ctr.pca), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "PC1 expression")
+
+
+
+#Let's check only choroid plexus & ependymal
+cp.ep <- c(na.omit(cell.types[cell.types[,1] %in% c('Chorioid plexus','Ependymal'),][1,][-1]),
+na.omit(cell.types[cell.types[,1] %in% c('Chorioid plexus','Ependymal'),][2,][-1]))
+
+ctr.df <- batch.rem3_mod1[,colnames(batch.rem3_mod1) %in% rownames(ctr.meta)]
+
+ComplexHeatmap::Heatmap(scale(t(ctr.df[rownames(ctr.df) %in% cp.ep,])),
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ctr.ra,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(scale(t(ctr.df[rownames(ctr.df) %in% cp.ep,]))), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
+
+```
+
+## Boxplots
+
+Let's make boxplots instead
+
+```{r cell.type_pca, echo=TRUE, fig.height = 7, fig.width = 10, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+ifng.pca <- PC.covs[!meta3$condition %in% 'LPS',]
+ifng.pca_long <- reshape::melt(ifng.pca)
+colnames(ifng.pca_long) <- c('Sample','Cell.type','PC')
+ifng.pca_long$Stimulation <- ifng.meta$condition
+ggplot(ifng.pca_long,aes_string(x='Cell.type',y='PC', fill='Stimulation')) +
+  #stat_compare_means(method = "t.test", label.y = 6) +
+  geom_boxplot() +
+  labs(title="Cell-type marker expression",x="Cell-type", y = "PC1 marker expression") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+
+ctr.meta <- meta3[meta3$condition %in% 'ctrl',]
+ctr.pca <- PC.covs[meta3$condition %in% 'ctrl',]
+coimg.pca_long <- reshape::melt(ctr.pca)
+colnames(coimg.pca_long) <- c('Sample','Cell.type','PC')
+coimg.pca_long$Coculture <- ctr.meta$COiMg
+ggplot(coimg.pca_long,aes_string(x='Cell.type',y='PC', fill='Coculture')) +
+  #stat_compare_means(method = "t.test", label.y = 6) +
+  geom_boxplot() +
+  labs(title="Cell-type marker expression",x="Cell-type", y = "PC1 marker expression") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
 ```
