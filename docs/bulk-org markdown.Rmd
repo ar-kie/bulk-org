@@ -1,7 +1,7 @@
 ---
 title: "bulk-org"
 author: "Raphael Kubler"
-date: "7/19/2023"
+date: "7/26/2023"
 output:
   rmarkdown::html_document:
    theme: united
@@ -185,7 +185,7 @@ volcano_plot(data.frame(res_COiMG), title = 'CO vs COiMg',
 
 ### Top 50 DEGs heatmap
 
-```{r heatmap.top50, echo=TRUE, fig.height = 4, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+```{r heatmap.top50, echo=TRUE, fig.height = 4, fig.width = 8, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
 top50.coimg <- rbind(results$COiMG[order(results$COiMG$log2FoldChange, decreasing = T),][results$COiMG[order(results$COiMG$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,],
 results$COiMG[order(results$COiMG$log2FoldChange, decreasing = F),][results$COiMG[order(results$COiMG$log2FoldChange, decreasing = F),]$padj < 0.05,][1:25,])
 
@@ -221,7 +221,13 @@ organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','
                                'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
 
 
-kable(cbind('DEG'=rownames(top50.coimg),'lFC'=round(top50.coimg$log2FoldChange,2),'Cilia-associated'=rownames(top50.coimg) %in% organoid$CBC), format = "html") %>% kable_styling("striped") %>% scroll_box(width = "100%")
+
+coimg.deg <- rbind(results$COiMG[rownames(results$COiMG) %in% na.omit(all_res$COiMG$DEGs[,1]),],
+                  results$COiMG[rownames(results$COiMG) %in% na.omit(all_res$COiMG$DEGs[,2]),])
+
+
+df <- cbind('DEG'=rownames(coimg.deg),'lFC'=round(coimg.deg$log2FoldChange,2),'Cilia-associated'=rownames(coimg.deg) %in% organoid$CBC)
+createDT(data.frame(df), "Status", scrollY=1000)
 
 ```
 
@@ -390,7 +396,7 @@ COiMg.degs <- all_res$COiMG$DEGs
 
 ### Top 50 DEGs heatmap
 
-```{r ifny.heatmap.top50, echo=TRUE, fig.height = 3, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+```{r ifny.heatmap.top50, echo=TRUE, fig.height = 3, fig.width = 8, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
 top50.ifng <- rbind(results$IFNg[order(results$IFNg$log2FoldChange, decreasing = T),][results$IFNg[order(results$IFNg$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,],
 results$IFNg[order(results$IFNg$log2FoldChange, decreasing = F),][results$IFNg[order(results$IFNg$log2FoldChange, decreasing = F),]$padj < 0.05,][1:25,])
 top50.names2 <- rownames(top50.ifng)
@@ -426,7 +432,14 @@ organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','
                                'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
 
 
-kable(cbind('DEG'=rownames(top50.ifng),'lFC'=round(top50.ifng$log2FoldChange,2),'Cilia-associated'=rownames(top50.ifng) %in% organoid$CBC), format = "html") %>% kable_styling("striped") %>% scroll_box(width = "100%")
+IFNg.deg <- rbind(results$IFNg[rownames(results$IFNg) %in% na.omit(all_res$IFNg$DEGs[,1]),],
+                  results$IFNg[rownames(results$IFNg) %in% na.omit(all_res$IFNg$DEGs[,2]),])
+
+
+df <- cbind('DEG'=rownames(IFNg.deg),'lFC'=round(IFNg.deg$log2FoldChange,2),'Cilia-associated'=rownames(IFNg.deg) %in% organoid$CBC)
+createDT(data.frame(df), "Status", scrollY=1000)
+
+
 
 ```
 
@@ -714,3 +727,82 @@ ggplot(coimg.pca_long,aes_string(x='Cell.type',y='PC', fill='Coculture')) +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
 ```
+
+
+# Dissecting DEA results
+
+## CO-IFNy
+
+These are the results of the DEA of CTR vs IFNy in CO (not co-cultured with microglia) only.
+Cilia-associated genes remain downregulated. We find this as well in CO vs COiMG and more so also in our single-cell data, which did not have any IFNy-stimulated samples.
+Meaning: this is a result robust to IFNy AND microglia co-culture separately.
+
+```{r DEA.COIFNy, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+load('/Users/kubler01/Documents/R projects/bulk-org/07262023_IFNy in CO.RData')
+
+new_IFNy$padj[is.na(new_IFNy$padj)] <- 1
+
+downreg.genes <- rownames(new_IFNy[new_IFNy$log2FoldChange < -1 & new_IFNy$padj < 0.05,])
+upreg.genes <- rownames(new_IFNy[new_IFNy$log2FoldChange > 1 & new_IFNy$padj < 0.05,])
+
+IFNy.res <- new_IFNy[rownames(new_IFNy) %in% c(upreg.genes,downreg.genes),]
+
+df <- cbind('DEG'=rownames(IFNy.res),'lFC'=round(IFNy.res$log2FoldChange,2),'Cilia-associated'=rownames(IFNy.res) %in% organoid$CBC)
+createDT(data.frame(df), "Stimulation", scrollY=1000)
+
+
+```
+
+### Volcano
+```{r ctrifny.volcano, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+new_IFNy$symbol <- rownames(new_IFNy)
+
+volcano_plot(data.frame(new_IFNy), title = 'ctrl vs IFNy',
+             annotate_by=c('CD36','CD68','CX3CR1','CSF1R','TREM2','TMEM119','ITGAX'), ymax1 = 30, ymax2 = 31)
+
+```
+
+## CO-COiMg
+
+This is to show that the DEA effect of cilia-associated genes remains present in our bulk-seq analysis when we subset to control samples only and test CO vs COiMg.
+
+```{r DEA.ctrCOIMG, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+setwd('/Users/kubler01/Documents/R projects/bulk-org')
+load('07262023_CO vs COiMG.RData')
+
+new_coimg$padj[is.na(new_coimg$padj)] <- 1
+downreg.genes <- rownames(new_coimg[new_coimg$log2FoldChange < -1 & new_coimg$padj < 0.05,])
+upreg.genes <- rownames(new_coimg[new_coimg$log2FoldChange > 1 & new_coimg$padj < 0.05,])
+
+coimg.res <- new_coimg[rownames(new_coimg) %in% c(upreg.genes,downreg.genes),]
+
+df <- cbind('DEG'=rownames(coimg.res),'lFC'=round(coimg.res$log2FoldChange,2),'Cilia-associated'=rownames(coimg.res) %in% organoid$CBC)
+createDT(data.frame(df), "COiMG", scrollY=1000)
+
+```
+### Volcano
+
+```{r ctrcoimg.volcano, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+new_coimg$symbol <- rownames(new_coimg)
+
+volcano_plot(data.frame(new_coimg), title = 'CO vs COiMg',
+             annotate_by=c('CD36','CD68','CX3CR1','CSF1R','TREM2','TMEM119','ITGAX'), ymax1 = 30, ymax2 = 31)
+
+```
+
+## Correlation of lFCs
+
+```{r DEA.cor, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+overlap <- rownames(coimg.res[rownames(coimg.res) %in% rownames(IFNy.res),])
+
+cor(coimg.res[rownames(coimg.res) %in% overlap,]$log2FoldChange,IFNy.res[rownames(IFNy.res) %in% overlap,]$log2FoldChange)
+
+createDT(cbind('Genes'=overlap,
+               'COiMg'=coimg.res[rownames(coimg.res) %in% overlap,]$log2FoldChange,
+               'IFNy'=IFNy.res[rownames(IFNy.res) %in% overlap,]$log2FoldChange), "COiMG", scrollY=1000)
+
+```
+
