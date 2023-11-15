@@ -1,0 +1,1016 @@
+---
+title: "bulk-org"
+author: "Raphael Kubler"
+date: "7/28/2023"
+output:
+  rmarkdown::html_document:
+   theme: united
+   highlight: tango
+   code_folding: hide
+   toc: true
+   toc_float: true
+   df_print: paged
+   smooth_scroll: true
+   number_sections: false
+   self_contained: true 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+setwd('/Users/kubler01/Documents/R projects/')
+load('funs.RData') #loads my functions
+setwd('/Users/kubler01/Documents/R projects/bulk-org')
+load('06272023_bulk org analysis.RData')
+load('06272023_bulk org all res.RData')
+library(tibble)
+library(matrixStats)
+library(factoextra)
+library(broom)
+library(ggpubr)
+library(tidyr)
+library(dplyr)
+library(plyr)
+library(ggeasy)
+library(ggrepel)
+library(gridExtra)
+library(ComplexHeatmap)
+library(DESeq2)
+library(dplyr)
+library(plyr)
+library(clusterProfiler)
+library(tidyr)
+library(biomaRt)
+library(variancePartition)
+library(ggrastr)
+library(kableExtra)
+```
+
+# Introduction
+
+Bulk RNA-seq analysis of cerebral organoid samples in conditions co-cultured (with/without microglia) and stimulation (ctr/LPS/IFNy).
+
+Updated V1.7 (07/26/2023): added DEA dissection
+Updated V1.7 (07/28/2023): added interaction analysis
+
+# CO vs COiMG
+
+Organoids co-cultured with vs without microglia. 
+
+## Variance analysis
+```{r pca, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+PCAplot(pca_cor3_mod1, "COiMg", Shape = "Line", PoV.df=PoV_cor3_mod1, pc.1 = 1, pc.2 = 2) #M30 & M33 are outleirs, let's remove them for now
+ggplot(pca.df_upgraded,aes_string(x='COiMG',y='Phagocytosis', fill='COiMG')) +
+  stat_compare_means(method = "t.test", label.y = 10, label.x = 1.3) +
+  geom_boxplot() +
+  geom_boxplot(width=0.1, fill="white") +
+  scale_fill_brewer(palette="Dark2") +
+  labs(title="Phagocytosis differential PC expression",x="COiMG", y = "PC1 Phagocytosis") +
+  theme_classic()
+```
+
+### Heatmap
+
+```{r heatmap Patir, echo=TRUE, fig.height = 3, fig.width = 11, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+#for control only
+ctr.meta <- meta3[meta3$condition %in% 'ctrl',]
+ctr.meta$COiMg[ctr.meta$COiMg %in% 'yes'] <- 'COiMg'
+ctr.meta$COiMg[ctr.meta$COiMg %in% 'no'] <- 'CO'
+
+#horizontal
+ra <- rowAnnotation(
+  COiMG = ctr.meta$COiMg[ctr.meta$condition %in% 'ctrl'],
+  col = list(
+    COiMG = c("COiMg"='tomato','CO'='lightblue')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+ctr <- t(batch.rem3_mod1[,meta3$condition %in% 'ctrl'])
+hm_counts <- scale(ctr[,colnames(ctr) %in% gene_panels_subset$Microglia])
+ComplexHeatmap::Heatmap(hm_counts,
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ra,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(hm_counts), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
+```
+
+## DEA
+
+### Volcano
+
+```{r dea, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+volcano_plot <- function(res, title = NULL, subtitle = NULL, annotate_by = NULL, type ='ALS', ymax1 = 7.5, ymax2 = 8, xmax1 = -4.5, xmax2 = 4.5){
+  res <- 
+    mutate(res,
+           sig = case_when(
+             padj >= 0.05 ~ "non_sig",
+             padj < 0.05 & abs(log2FoldChange) < 1 ~ "sig",
+             padj < 0.05 & abs(log2FoldChange) >= 1 ~ "sig - strong"
+           )) %>%
+    mutate(direction = ifelse(log2FoldChange > 0, "up", "down")) %>%
+    mutate(log2FoldChange = case_when(
+      log2FoldChange > 10 ~ Inf,
+      log2FoldChange < -10 ~ -Inf,
+      TRUE ~ log2FoldChange
+    )) %>%
+    mutate(class = paste(sig, direction))
+  if( type == "ALS"){
+    xpos <- 0.5
+    ymax <- ymax1
+    xlim <- c(xmax1,xmax2)
+  }else{
+    xpos <- 0.025
+    ymax <- ymax2
+    xlim <- c(-0.042, 0.042)
+  }
+  de_tally <- group_by(res, sig, direction, class) %>% tally() %>%
+    filter(sig != "non_sig") %>%
+    mutate( position = ifelse(sig == "sig", xpos, 2) ) %>%
+    mutate(position = ifelse( direction == "down", -1 * position, position)) %>%
+    mutate(n = formatC(n, format="f", big.mark=",", digits=0))
+  plot <- res %>%
+    mutate( pvalue = ifelse( pvalue < 1e-90, Inf, pvalue)) %>% #threshold at 1e16
+    ggplot(aes(x = log2FoldChange, y = -log10(pvalue))) + 
+    #geom_point(aes(colour = class ), size = 0.5) +
+    rasterise(geom_point(aes(colour = class ), size = 0.5), dpi = 300) +
+    scale_colour_manual(values = c("non_sig up" = "gray", 
+                                   "non_sig down" = "gray",
+                                   "sig up" = "#EB7F56", 
+                                   "sig - strong up" = "#B61927",
+                                   "sig down" = "#4F8FC4",
+                                   "sig - strong down" = "dodgerblue4"
+    )) +
+    theme_bw() +
+    labs(y = expression(-log[10]~P~value), x = expression(log[2]~"(fold change)"), title = title, subtitle = subtitle) +
+    guides(colour = FALSE) +
+    scale_y_continuous(expand = c(0,0), limits = c(0,ymax)) +
+    theme_bw() +
+    theme(
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5),
+      panel.border = element_blank(),
+      axis.ticks = element_line(colour = "black")
+    ) +
+    geom_text(fontface = "bold", data = de_tally, aes(x = position, y = ymax - 0.5, label = n, colour = class), size = 4) +
+    scale_x_continuous(limits = xlim)
+  if(!is.null(annotate_by)){
+    plot <- plot + 
+      ggrepel::geom_text_repel(
+        fontface = "italic",
+        data = filter(res, symbol %in% annotate_by), 
+        aes(x = log2FoldChange, y = -log10(pvalue), label = symbol), 
+        min.segment.length = unit(0, "lines"),
+        size = 2.3) +
+      geom_point(
+        data = filter(res, symbol %in% annotate_by), size = 0.8, colour = "black"
+      ) +
+      geom_point(aes(colour = class ),
+                 data = filter(res, symbol %in% annotate_by), size = 0.6
+      )
+  }
+  return(plot)
+}
+res_COiMG$symbol <- rownames(res_COiMG)
+volcano_plot(data.frame(res_COiMG), title = 'CO vs COiMg',
+             annotate_by=c('CD36','CD68','CX3CR1','CSF1R','TREM2','TMEM119','ITGAX'), ymax1 = 30, ymax2 = 31)
+
+```
+
+
+### Top 50 DEGs heatmap
+
+```{r heatmap.top50, echo=TRUE, fig.height = 4, fig.width = 8, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+top50.coimg <- rbind(results$COiMG[order(results$COiMG$log2FoldChange, decreasing = T),][results$COiMG[order(results$COiMG$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,],
+results$COiMG[order(results$COiMG$log2FoldChange, decreasing = F),][results$COiMG[order(results$COiMG$log2FoldChange, decreasing = F),]$padj < 0.05,][1:25,])
+
+top50.names <- rownames(top50.coimg)
+
+ra2 <- rowAnnotation(
+  COiMG = meta3$COiMg,
+  col = list(
+    COiMG = c("yes"='tomato','no'='lightblue')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+ComplexHeatmap::Heatmap(scale(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names,])),
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ra2,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names,])), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
+```
+Which genes of the top DEGs are cilia-associated (CBC)?
+```{r coimg.table, echo=TRUE, message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+ogenes <- readxl::read_xlsx('gene list_cell type.xlsx', col_names = T)
+
+organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','IN','Neuron','Inter','OPC/OL','GPC','NEC 1',
+                               'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
+
+
+
+coimg.deg <- rbind(results$COiMG[rownames(results$COiMG) %in% na.omit(all_res$COiMG$DEGs[,1]),],
+                  results$COiMG[rownames(results$COiMG) %in% na.omit(all_res$COiMG$DEGs[,2]),])
+
+
+df <- cbind('DEG'=rownames(coimg.deg),'lFC'=round(coimg.deg$log2FoldChange,2),'Cilia-associated'=rownames(coimg.deg) %in% organoid$CBC)
+createDT(data.frame(df), "Status", scrollY=1000)
+
+```
+
+### GO
+
+```{r GO, echo=TRUE, fig.height = 10, fig.width = 7, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+dotplot(all_res$COiMG$GO.up, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+dotplot(all_res$COiMG$GO.down, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+
+```
+
+### Enrichment
+
+```{r enrichment, echo=TRUE, fig.height = 6, fig.width = 2, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+ogenes <- readxl::read_xlsx('gene list_cell type.xlsx', col_names = T)
+
+organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','IN','Neuron','Inter','OPC/OL','GPC','NEC 1',
+                               'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
+
+
+#gene set enrichment analysis:
+DEG.enrich.res <- matrix(nrow=2*length(colnames(organoid)), ncol=6)
+DEG.rep <- NULL
+for (i in names(organoid))
+  DEG.rep <- c(DEG.rep, paste(i, "_up", sep=""), paste(i, "_down", sep=""))
+DEGs <- list("Up-regulated"=na.omit(all_res$COiMG$DEGs[,1]),"Down-regulated"=na.omit(all_res$COiMG$DEGs[,2]))
+rownames(DEG.enrich.res) <- DEG.rep
+colnames(DEG.enrich.res ) <- colnames(GSEA.byMod(mod.gl=DEGs, organoid[,i], universe=35324))
+
+
+for (x in colnames(organoid)){
+  DEG.enrich.res[gsub("*_up","",gsub("*_down","",rownames(DEG.enrich.res))) %in% x,] <- as.matrix(GSEA.byMod(mod.gl=DEGs, na.omit(as.matrix(organoid)[,x]), universe=na.omit(rownames(res))))
+}
+
+DEG.enrich.res <- data.frame(DEG.enrich.res)
+DEG.enrich.res$log.q <- -log2(DEG.enrich.res[,6])
+
+#DEG.enrich.res[is.infinite(DEG.enrich.res$log.q),]$log.q <- 1
+DEG.enrich <- cbind("Upregulated"=DEG.enrich.res[c(seq(1, length(rownames(DEG.enrich.res))-1, by = 2)),][,7],
+                    "Downregulated"=DEG.enrich.res[c(seq(2, length(rownames(DEG.enrich.res)), by = 2)),][,7])
+rownames(DEG.enrich) <- names(organoid)
+
+DEG.enrich[DEG.enrich > 20] <- 20
+ComplexHeatmap::Heatmap(DEG.enrich,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+
+```
+
+For microglia pathways.
+```{r microglia, echo=TRUE, fig.height = 6, fig.width = 4, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+DEG.enrich.res <- matrix(nrow=2*length(colnames(gene_panels_subset)), ncol=6)
+DEG.rep <- NULL
+for (i in names(gene_panels_subset))
+  DEG.rep <- c(DEG.rep, paste(i, "_up", sep=""), paste(i, "_down", sep=""))
+DEGs <- list("Up-regulated"=na.omit(all_res$COiMG$DEGs[,1]),"Down-regulated"=na.omit(all_res$COiMG$DEGs[,2]))
+rownames(DEG.enrich.res) <- DEG.rep
+colnames(DEG.enrich.res ) <- colnames(GSEA.byMod(mod.gl=DEGs, gene_panels_subset[,i], universe=35324))
+
+
+for (x in colnames(gene_panels_subset)){
+  DEG.enrich.res[gsub("*_up","",gsub("*_down","",rownames(DEG.enrich.res))) %in% x,] <- as.matrix(GSEA.byMod(mod.gl=DEGs, na.omit(gene_panels_subset[,x]), universe=rownames(res)))
+}
+
+DEG.enrich.res <- data.frame(DEG.enrich.res)
+DEG.enrich.res$log.q <- -log2(DEG.enrich.res[,6])
+
+#DEG.enrich.res[is.infinite(DEG.enrich.res$log.q),]$log.q <- 1
+DEG.enrich <- cbind("Upregulated"=DEG.enrich.res[c(seq(1, length(rownames(DEG.enrich.res))-1, by = 2)),][,7],
+                    "Downregulated"=DEG.enrich.res[c(seq(2, length(rownames(DEG.enrich.res)), by = 2)),][,7])
+rownames(DEG.enrich) <- names(gene_panels_subset)
+DEG.enrich[DEG.enrich > 20] <- 20
+ComplexHeatmap::Heatmap(DEG.enrich,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+```
+
+```{r ndd enrich, echo=TRUE, fig.height = 3, fig.width = 4, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/ndd')
+cgenes <- readxl::read_xlsx('Gene lists for organoid paper.xlsx', col_names = T)
+m <- data.frame(t(toupper(na.omit(cgenes$`ADHD GWAS associated genes through FUMA`))[toupper(na.omit(cgenes$`ADHD GWAS associated genes through FUMA`)) %in% rownames(bulkorg_counts3)]), check.names = F)
+for(i in names(cgenes)[-1]){
+  k <- na.omit(cgenes[i])
+  s <- k[as.matrix(k)[,1] %in% rownames(bulkorg_counts3),]
+  m <- rbind.fill(data.frame(m),data.frame(t(s)))
+}
+rownames(m) <- names(cgenes)
+m <- t(m)
+#gene set enrichment analysis:
+ndd.enrich <- matrix(nrow=2*length(colnames(m)), ncol=6)
+ndd.rep <- NULL
+for (i in colnames(m))
+  ndd.rep <- c(ndd.rep, paste(i, "_up", sep=""), paste(i, "_down", sep=""))
+rownames(ndd.enrich) <- ndd.rep
+colnames(ndd.enrich) <- colnames(GSEA.byMod(mod.gl=DEGs, m[,1], universe=35324))
+
+
+for (x in colnames(m)){
+  ndd.enrich[gsub("*_up","",gsub("*_down","",rownames(ndd.enrich))) %in% x,] <- as.matrix(GSEA.byMod(mod.gl=DEGs, na.omit(as.matrix(m)[,x]), universe=na.omit(rownames(res))))
+}
+
+ndd.enrich <- data.frame(ndd.enrich)
+ndd.enrich$log.q <- -log2(ndd.enrich[,6])
+
+#DEG.enrich.res[is.infinite(DEG.enrich.res$log.q),]$log.q <- 1
+ndd.enrich.ress <- cbind("Upregulated"=ndd.enrich[c(seq(1, length(rownames(ndd.enrich))-1, by = 2)),][,7],
+                    "Downregulated"=ndd.enrich[c(seq(2, length(rownames(ndd.enrich)), by = 2)),][,7])
+rownames(ndd.enrich.ress) <- colnames(m)
+
+ComplexHeatmap::Heatmap(ndd.enrich.ress,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+
+```
+
+
+# IFNy stimulation
+
+Let's do this for IFNy stimulation
+
+## Variance analysis
+
+```{r ifny.pca, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+PCAplot(pca_cor3_mod1, "condition", Shape = "Line", PoV.df=PoV_cor3_mod1, pc.1 = 1, pc.2 = 2) #M30 & M33 are outleirs, let's remove them for now
+ggplot(pca.df_upgraded,aes_string(x='Condition',y='`IFNy`', fill='Condition')) +
+  #stat_compare_means(method = "t.test", label.y = 20, label.x = 2) +
+  geom_boxplot() +
+  geom_boxplot(width=0.1, fill="white") +
+  scale_fill_brewer(palette="Dark2") +
+  labs(title="Condition differential PC expression",x="Condition", y = "PC1 IFNy response") +
+  theme_classic()
+```
+
+
+## DEA
+
+### Volcano
+```{r ifny.volcano, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+res_IFNg$symbol <- rownames(res_IFNg)
+
+volcano_plot(data.frame(res_IFNg), title = 'CTR vs IFNy',
+             annotate_by=c('CD36','CD68','CX3CR1','CSF1R','TREM2','TMEM119','ITGAX'), ymax1 = 30, ymax2 = 31)
+COiMg.degs <- all_res$COiMG$DEGs
+
+```
+
+### Top 50 DEGs heatmap
+
+```{r ifny.heatmap.top50, echo=TRUE, fig.height = 3, fig.width = 8, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+top50.ifng <- rbind(results$IFNg[order(results$IFNg$log2FoldChange, decreasing = T),][results$IFNg[order(results$IFNg$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,],
+results$IFNg[order(results$IFNg$log2FoldChange, decreasing = F),][results$IFNg[order(results$IFNg$log2FoldChange, decreasing = F),]$padj < 0.05,][1:25,])
+top50.names2 <- rownames(top50.ifng)
+ra3 <- rowAnnotation(
+  Stimulation = meta3$condition,
+  col = list(
+    Stimulation = c("ctrl"='lightblue','IFNg'='tomato', 'LPS'='darkred')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+ComplexHeatmap::Heatmap(scale(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names2,])),
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ra3,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names2,])), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
+
+```
+
+Which genes of the top DEGs are cilia-associated (CBC)?
+```{r ifny.table, echo=TRUE, message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+ogenes <- readxl::read_xlsx('gene list_cell type.xlsx', col_names = T)
+
+organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','IN','Neuron','Inter','OPC/OL','GPC','NEC 1',
+                               'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
+
+
+IFNg.deg <- rbind(results$IFNg[rownames(results$IFNg) %in% na.omit(all_res$IFNg$DEGs[,1]),],
+                  results$IFNg[rownames(results$IFNg) %in% na.omit(all_res$IFNg$DEGs[,2]),])
+
+
+df <- cbind('DEG'=rownames(IFNg.deg),'lFC'=round(IFNg.deg$log2FoldChange,2),'Cilia-associated'=rownames(IFNg.deg) %in% organoid$CBC)
+createDT(data.frame(df), "Status", scrollY=1000)
+
+
+
+```
+
+
+### GO
+
+```{r ifny.GO, echo=TRUE, fig.height = 10, fig.width = 7, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+dotplot(all_res$IFNg$GO.up, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+dotplot(all_res$IFNg$GO.down, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+
+```
+
+
+### Enrichment
+
+For organoid cell-types.
+
+```{r ifny.enrich, fig.height = 6, fig.width = 3, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+ogenes <- readxl::read_xlsx('gene list_cell type.xlsx', col_names = T)
+
+organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','IN','Neuron','Inter','OPC/OL','GPC','NEC 1',
+                               'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
+
+
+#gene set enrichment analysis:
+DEG.enrich.res <- matrix(nrow=2*length(colnames(organoid)), ncol=6)
+DEG.rep <- NULL
+for (i in names(organoid))
+  DEG.rep <- c(DEG.rep, paste(i, "_up", sep=""), paste(i, "_down", sep=""))
+DEGs <- list("Up-regulated"=na.omit(all_res$IFNg$DEGs[,1]),"Down-regulated"=na.omit(all_res$IFNg$DEGs[,2]))
+rownames(DEG.enrich.res) <- DEG.rep
+colnames(DEG.enrich.res ) <- colnames(GSEA.byMod(mod.gl=DEGs, organoid[,i], universe=35324))
+
+
+for (x in colnames(organoid)){
+  DEG.enrich.res[gsub("*_up","",gsub("*_down","",rownames(DEG.enrich.res))) %in% x,] <- as.matrix(GSEA.byMod(mod.gl=DEGs, na.omit(as.matrix(organoid)[,x]), universe=na.omit(rownames(res))))
+}
+
+DEG.enrich.res <- data.frame(DEG.enrich.res)
+DEG.enrich.res$log.q <- -log2(DEG.enrich.res[,6])
+
+#DEG.enrich.res[is.infinite(DEG.enrich.res$log.q),]$log.q <- 1
+DEG.enrich <- cbind("Upregulated"=DEG.enrich.res[c(seq(1, length(rownames(DEG.enrich.res))-1, by = 2)),][,7],
+                    "Downregulated"=DEG.enrich.res[c(seq(2, length(rownames(DEG.enrich.res)), by = 2)),][,7])
+rownames(DEG.enrich) <- names(organoid)
+
+DEG.enrich[DEG.enrich > 20] <- 20
+ComplexHeatmap::Heatmap(DEG.enrich,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+
+
+```
+For NDD gene lists.
+
+```{r ifny.ndd, echo=TRUE, fig.height = 3, fig.width = 4, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/ndd')
+
+#gene set enrichment analysis:
+ndd.enrich <- matrix(nrow=2*length(colnames(m)), ncol=6)
+ndd.rep <- NULL
+for (i in colnames(m))
+  ndd.rep <- c(ndd.rep, paste(i, "_up", sep=""), paste(i, "_down", sep=""))
+rownames(ndd.enrich) <- ndd.rep
+colnames(ndd.enrich) <- colnames(GSEA.byMod(mod.gl=DEGs, m[,1], universe=35324))
+
+
+for (x in colnames(m)){
+  ndd.enrich[gsub("*_up","",gsub("*_down","",rownames(ndd.enrich))) %in% x,] <- as.matrix(GSEA.byMod(mod.gl=DEGs, na.omit(as.matrix(m)[,x]), universe=na.omit(rownames(res))))
+}
+
+ndd.enrich <- data.frame(ndd.enrich)
+ndd.enrich$log.q <- -log2(ndd.enrich[,6])
+
+#DEG.enrich.res[is.infinite(DEG.enrich.res$log.q),]$log.q <- 1
+ndd.enrich.ress <- cbind("Upregulated"=ndd.enrich[c(seq(1, length(rownames(ndd.enrich))-1, by = 2)),][,7],
+                    "Downregulated"=ndd.enrich[c(seq(2, length(rownames(ndd.enrich)), by = 2)),][,7])
+rownames(ndd.enrich.ress) <- colnames(m)
+
+ComplexHeatmap::Heatmap(ndd.enrich.ress,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+
+
+DEGs$`Down-regulated`[DEGs$`Down-regulated` %in% as.character(na.omit(m[,12]))]
+
+```
+
+
+
+For microglia pathways.
+```{r ifny.microglia, echo=TRUE, fig.height = 6, fig.width = 4, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+DEG.enrich.res <- matrix(nrow=2*length(colnames(gene_panels_subset)), ncol=6)
+DEG.rep <- NULL
+for (i in names(gene_panels_subset))
+  DEG.rep <- c(DEG.rep, paste(i, "_up", sep=""), paste(i, "_down", sep=""))
+DEGs <- list("Up-regulated"=na.omit(all_res$IFNg$DEGs[,1]),"Down-regulated"=na.omit(all_res$IFNg$DEGs[,2]))
+rownames(DEG.enrich.res) <- DEG.rep
+colnames(DEG.enrich.res ) <- colnames(GSEA.byMod(mod.gl=DEGs, gene_panels_subset[,i], universe=35324))
+
+
+for (x in colnames(gene_panels_subset)){
+  DEG.enrich.res[gsub("*_up","",gsub("*_down","",rownames(DEG.enrich.res))) %in% x,] <- as.matrix(GSEA.byMod(mod.gl=DEGs, na.omit(gene_panels_subset[,x]), universe=rownames(res)))
+}
+
+DEG.enrich.res <- data.frame(DEG.enrich.res)
+DEG.enrich.res$log.q <- -log2(DEG.enrich.res[,6])
+
+#DEG.enrich.res[is.infinite(DEG.enrich.res$log.q),]$log.q <- 1
+DEG.enrich <- cbind("Upregulated"=DEG.enrich.res[c(seq(1, length(rownames(DEG.enrich.res))-1, by = 2)),][,7],
+                    "Downregulated"=DEG.enrich.res[c(seq(2, length(rownames(DEG.enrich.res)), by = 2)),][,7])
+rownames(DEG.enrich) <- names(gene_panels_subset)
+DEG.enrich[DEG.enrich > 20] <- 20
+ComplexHeatmap::Heatmap(DEG.enrich,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+```
+
+
+# Cell-type marker analysis
+
+Cell-types with only 1 gene found back in our expression data carry principal component expression = 0. 
+
+## Heatmaps of gene & PC expression
+```{r cell.type, echo=TRUE, fig.height = 4, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+cell.types <- as.matrix(readxl::read_xlsx('Typical markers cell types organoids 07182023.xlsx', col_names = F))
+
+
+
+PC.covs <- matrix(ncol=length(cell.types[,1]),nrow=length(colnames(batch.rem3_mod1)))
+colnames(PC.covs) <- cell.types[,1]
+for(i in cell.types[,1]){
+  pca.cov <- prcomp(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% cell.types[cell.types[,1] %in% i,][-1],]))
+  PC.covs[,i] <- pca.cov$x[,1]
+  #if (table(rownames(batch.rem3_mod1) %in% cell.types[cell.types[,1] %in% i,][-1])[[2]] == 1){
+  #  PC.covs[,i] <- t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% cell.types[cell.types[,1] %in% i,][-1],])
+  #}
+}
+rownames(PC.covs) <- colnames(batch.rem3_mod1)
+
+ra4 <- rowAnnotation(
+  Stimulation = meta3$condition,
+  COiMG = meta3$COiMg,
+  col = list(COiMG = c('yes'='black','no'='white'),
+    Stimulation = c("ctrl"='lightblue','IFNg'='tomato', 'LPS'='darkred')),
+  show_annotation_name = T,
+  show_legend = T)
+
+ComplexHeatmap::Heatmap(PC.covs,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ra4,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(PC.covs), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "PC1 expression")
+
+#Let's do that for ctr/ifng and coimg/CO only
+#for control only
+ctr.meta <- meta3[meta3$condition %in% 'ctrl',]
+
+#horizontal
+ctr.ra <- rowAnnotation(
+  COiMG = ctr.meta$COiMg,
+  col = list(
+    COiMG = c("yes"='tomato','no'='lightblue')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+ctr.pca <- PC.covs[meta3$condition %in% 'ctrl',]
+ComplexHeatmap::Heatmap(ctr.pca,
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ctr.ra,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(ctr.pca), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "PC1 expression")
+
+
+ifng.meta <- meta3[!meta3$condition %in% 'LPS',]
+
+#horizontal
+ifng.ra <- rowAnnotation(
+  COiMG = ifng.meta$COiMg,
+  Stimulation = ifng.meta$condition,
+  col = list(COiMG = c('yes'='black','no'='white'),
+    Stimulation = c("ctrl"='lightblue','IFNg'='tomato', 'LPS'='darkred')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+ifng.pca <- PC.covs[!meta3$condition %in% 'LPS',]
+ComplexHeatmap::Heatmap(ifng.pca,
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ifng.ra,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(ctr.pca), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "PC1 expression")
+
+
+
+#Let's check only choroid plexus & ependymal
+cp.ep <- c(na.omit(cell.types[cell.types[,1] %in% c('Chorioid plexus','Ependymal'),][1,][-1]),
+na.omit(cell.types[cell.types[,1] %in% c('Chorioid plexus','Ependymal'),][2,][-1]))
+
+ctr.df <- batch.rem3_mod1[,colnames(batch.rem3_mod1) %in% rownames(ctr.meta)]
+
+ComplexHeatmap::Heatmap(scale(t(ctr.df[rownames(ctr.df) %in% cp.ep,])),
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ctr.ra,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(scale(t(ctr.df[rownames(ctr.df) %in% cp.ep,]))), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
+
+```
+
+## Boxplots
+
+Let's make boxplots instead
+
+```{r cell.type_pca, echo=TRUE, fig.height = 7, fig.width = 10, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+ifng.pca <- PC.covs[!meta3$condition %in% 'LPS',]
+ifng.pca_long <- reshape::melt(ifng.pca)
+colnames(ifng.pca_long) <- c('Sample','Cell.type','PC')
+ifng.pca_long$Stimulation <- ifng.meta$condition
+ggplot(ifng.pca_long,aes_string(x='Cell.type',y='PC', fill='Stimulation')) +
+  #stat_compare_means(method = "t.test", label.y = 6) +
+  geom_boxplot() +
+  labs(title="Cell-type marker expression",x="Cell-type", y = "PC1 marker expression") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+
+ctr.meta <- meta3[meta3$condition %in% 'ctrl',]
+ctr.pca <- PC.covs[meta3$condition %in% 'ctrl',]
+coimg.pca_long <- reshape::melt(ctr.pca)
+colnames(coimg.pca_long) <- c('Sample','Cell.type','PC')
+coimg.pca_long$Coculture <- ctr.meta$COiMg
+ggplot(coimg.pca_long,aes_string(x='Cell.type',y='PC', fill='Coculture')) +
+  #stat_compare_means(method = "t.test", label.y = 6) +
+  geom_boxplot() +
+  labs(title="Cell-type marker expression",x="Cell-type", y = "PC1 marker expression") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+```
+
+
+# Dissecting DEA results
+
+## CO-IFNy
+
+These are the results of the DEA of CTR vs IFNy in CO (not co-cultured with microglia) only.
+Cilia-associated genes remain downregulated. We find this as well in CO vs COiMG and more so also in our single-cell data, which did not have any IFNy-stimulated samples.
+Meaning: this is a result robust to IFNy AND microglia co-culture separately.
+
+```{r DEA.COIFNy, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+load('/Users/kubler01/Documents/R projects/bulk-org/07262023_IFNy in CO.RData')
+
+new_IFNy$padj[is.na(new_IFNy$padj)] <- 1
+
+downreg.genes <- rownames(new_IFNy[new_IFNy$log2FoldChange < -1 & new_IFNy$padj < 0.05,])
+upreg.genes <- rownames(new_IFNy[new_IFNy$log2FoldChange > 1 & new_IFNy$padj < 0.05,])
+
+IFNy.res <- new_IFNy[rownames(new_IFNy) %in% c(upreg.genes,downreg.genes),]
+
+df <- cbind('DEG'=rownames(IFNy.res),'lFC'=round(IFNy.res$log2FoldChange,2),'Cilia-associated'=rownames(IFNy.res) %in% organoid$CBC)
+createDT(data.frame(df), "Stimulation", scrollY=1000)
+
+
+```
+
+### Volcano
+```{r ctrifny.volcano, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+new_IFNy$symbol <- rownames(new_IFNy)
+
+volcano_plot(data.frame(new_IFNy), title = 'ctrl vs IFNy',
+             annotate_by=c('CD36','CD68','CX3CR1','CSF1R','TREM2','TMEM119','ITGAX'), ymax1 = 30, ymax2 = 31)
+
+```
+
+## CO-COiMg
+
+This is to show that the DEA effect of cilia-associated genes remains present in our bulk-seq analysis when we subset to control samples only and test CO vs COiMg.
+
+```{r DEA.ctrCOIMG, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+setwd('/Users/kubler01/Documents/R projects/bulk-org')
+load('07262023_CO vs COiMG.RData')
+
+new_coimg$padj[is.na(new_coimg$padj)] <- 1
+downreg.genes <- rownames(new_coimg[new_coimg$log2FoldChange < -1 & new_coimg$padj < 0.05,])
+upreg.genes <- rownames(new_coimg[new_coimg$log2FoldChange > 1 & new_coimg$padj < 0.05,])
+
+coimg.res <- new_coimg[rownames(new_coimg) %in% c(upreg.genes,downreg.genes),]
+
+df <- cbind('DEG'=rownames(coimg.res),'lFC'=round(coimg.res$log2FoldChange,2),'Cilia-associated'=rownames(coimg.res) %in% organoid$CBC)
+createDT(data.frame(df), "COiMG", scrollY=1000)
+
+```
+### Volcano
+
+```{r ctrcoimg.volcano, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+new_coimg$symbol <- rownames(new_coimg)
+
+volcano_plot(data.frame(new_coimg), title = 'CO vs COiMg',
+             annotate_by=c('CD36','CD68','CX3CR1','CSF1R','TREM2','TMEM119','ITGAX'), ymax1 = 30, ymax2 = 31)
+
+```
+
+## Correlation of lFCs
+
+```{r DEA.cor, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+overlap <- rownames(coimg.res[rownames(coimg.res) %in% rownames(IFNy.res),])
+
+cor(coimg.res[rownames(coimg.res) %in% overlap,]$log2FoldChange,IFNy.res[rownames(IFNy.res) %in% overlap,]$log2FoldChange)
+
+createDT(cbind('Genes'=overlap,
+               'COiMg'=coimg.res[rownames(coimg.res) %in% overlap,]$log2FoldChange,
+               'IFNy'=IFNy.res[rownames(IFNy.res) %in% overlap,]$log2FoldChange), "COiMG", scrollY=1000)
+
+```
+
+# Interaction analysis
+
+Interaction analysis of co-culture*IFNy
+
+What happens if you co-culture AND stimulate with IFNy?
+
+## Variance analysis
+
+```{r int.pca, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+pca_cor3_mod1$interaction <- as.factor(pca_cor3_mod1$COiMg):as.factor(pca_cor3_mod1$condition)
+PCAplot(pca_cor3_mod1, "interaction", Shape = "Line", PoV.df=PoV_cor3_mod1, pc.1 = 1, pc.2 = 2, 
+        colors = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"Spectral")))(6)) #M30 & M33 are outleirs, let's remove them for now
+ggplot(pca.df_upgraded,aes_string(x='Condition',y='`IFNy`', fill='Condition')) +
+  #stat_compare_means(method = "t.test", label.y = 20, label.x = 2) +
+  geom_boxplot() +
+  geom_boxplot(width=0.1, fill="white") +
+  scale_fill_brewer(palette="Dark2") +
+  labs(title="Condition differential PC expression",x="Condition", y = "PC1 IFNy response") +
+  theme_classic()
+```
+
+## DEA
+
+### Volcano
+```{r int.volcano, echo=TRUE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+res_COiMGxIFNg$symbol <- rownames(res_COiMGxIFNg)
+
+volcano_plot(data.frame(res_COiMGxIFNg), title = 'CTR vs IFNy',
+             annotate_by=c('CD36','CD68','CX3CR1','CSF1R','TREM2','TMEM119','ITGAX'), ymax1 = 10, ymax2 = 11)
+
+
+```
+
+### Top 50 DEGs heatmap
+
+```{r int.heatmap.top50, echo=TRUE, fig.height = 3, fig.width = 8, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+top50.ifngxcoimg <- rbind(results$COiMGxIFNg[order(results$COiMGxIFNg$log2FoldChange, decreasing = T),][results$COiMGxIFNg[order(results$COiMGxIFNg$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,],
+results$COiMGxIFNg[order(results$COiMGxIFNg$log2FoldChange, decreasing = F),][results$COiMGxIFNg[order(results$COiMGxIFNg$log2FoldChange, decreasing = F),]$padj < 0.05,][1:25,])
+top50.names2 <- rownames(top50.ifngxcoimg)
+ra4 <- rowAnnotation(
+  Stimulation = c(meta3$condition),
+  Coculture = c(meta3$COiMg),
+  col = list(
+    Stimulation = c("ctrl"='lightblue','IFNg'='tomato', 'LPS'='darkred'),
+    Coculture = c('yes'='black','no'='white')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+ComplexHeatmap::Heatmap(scale(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names2,])),
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        left_annotation = ra4,
+                        bottom_annotation = HeatmapAnnotation(
+                        text = anno_text(colnames(t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% top50.names2,])), rot = 300, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
+
+```
+
+Which genes of the top DEGs are cilia-associated (CBC)?
+```{r int.table, echo=TRUE, message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+ogenes <- readxl::read_xlsx('gene list_cell type.xlsx', col_names = T)
+
+organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','IN','Neuron','Inter','OPC/OL','GPC','NEC 1',
+                               'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
+
+
+int.deg <- rbind(results$COiMGxIFNg[rownames(results$COiMGxIFNg) %in% na.omit(all_res$COiMGxIFNg$DEGs[,1]),],
+                  results$COiMGxIFNg[rownames(results$COiMGxIFNg) %in% na.omit(all_res$COiMGxIFNg$DEGs[,2]),])
+
+
+df <- cbind('DEG'=rownames(int.deg),'lFC'=round(int.deg$log2FoldChange,2),'Cilia-associated'=rownames(int.deg) %in% organoid$CBC)
+createDT(data.frame(df), "Status", scrollY=1000)
+
+
+
+```
+
+
+### GO
+
+```{r int.GO, echo=TRUE, fig.height = 10, fig.width = 7, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+dotplot(all_res$COiMGxIFNg$GO.up, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+dotplot(all_res$COiMGxIFNg$GO.down, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+
+```
+
+
+### Enrichment
+
+For organoid cell-types.
+
+```{r int.enrich, fig.height = 6, fig.width = 3, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+ogenes <- readxl::read_xlsx('gene list_cell type.xlsx', col_names = T)
+
+organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','IN','Neuron','Inter','OPC/OL','GPC','NEC 1',
+                               'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
+
+
+#gene set enrichment analysis:
+DEG.enrich.res <- matrix(nrow=2*length(colnames(organoid)), ncol=6)
+DEG.rep <- NULL
+for (i in names(organoid))
+  DEG.rep <- c(DEG.rep, paste(i, "_up", sep=""), paste(i, "_down", sep=""))
+DEGs <- list("Up-regulated"=na.omit(all_res$COiMGxIFNg$DEGs[,1]),"Down-regulated"=na.omit(all_res$COiMGxIFNg$DEGs[,2]))
+rownames(DEG.enrich.res) <- DEG.rep
+colnames(DEG.enrich.res ) <- colnames(GSEA.byMod(mod.gl=DEGs, organoid[,i], universe=35324))
+
+
+for (x in colnames(organoid)){
+  DEG.enrich.res[gsub("*_up","",gsub("*_down","",rownames(DEG.enrich.res))) %in% x,] <- as.matrix(GSEA.byMod(mod.gl=DEGs, na.omit(as.matrix(organoid)[,x]), universe=na.omit(rownames(res))))
+}
+
+DEG.enrich.res <- data.frame(DEG.enrich.res)
+DEG.enrich.res$log.q <- -log2(DEG.enrich.res[,6])
+
+#DEG.enrich.res[is.infinite(DEG.enrich.res$log.q),]$log.q <- 1
+DEG.enrich <- cbind("Upregulated"=DEG.enrich.res[c(seq(1, length(rownames(DEG.enrich.res))-1, by = 2)),][,7],
+                    "Downregulated"=DEG.enrich.res[c(seq(2, length(rownames(DEG.enrich.res)), by = 2)),][,7])
+rownames(DEG.enrich) <- names(organoid)
+
+DEG.enrich[DEG.enrich > 20] <- 20
+ComplexHeatmap::Heatmap(DEG.enrich,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+
+
+```
+
+
+
+For microglia pathways.
+```{r int.microglia, echo=TRUE, fig.height = 6, fig.width = 4, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+DEG.enrich.res <- matrix(nrow=2*length(colnames(gene_panels_subset)), ncol=6)
+DEG.rep <- NULL
+for (i in names(gene_panels_subset))
+  DEG.rep <- c(DEG.rep, paste(i, "_up", sep=""), paste(i, "_down", sep=""))
+DEGs <- list("Up-regulated"=na.omit(all_res$COiMGxIFNg$DEGs[,1]),"Down-regulated"=na.omit(all_res$COiMGxIFNg$DEGs[,2]))
+rownames(DEG.enrich.res) <- DEG.rep
+colnames(DEG.enrich.res ) <- colnames(GSEA.byMod(mod.gl=DEGs, gene_panels_subset[,i], universe=35324))
+
+
+for (x in colnames(gene_panels_subset)){
+  DEG.enrich.res[gsub("*_up","",gsub("*_down","",rownames(DEG.enrich.res))) %in% x,] <- as.matrix(GSEA.byMod(mod.gl=DEGs, na.omit(gene_panels_subset[,x]), universe=rownames(res)))
+}
+
+DEG.enrich.res <- data.frame(DEG.enrich.res)
+DEG.enrich.res$log.q <- -log2(DEG.enrich.res[,6])
+
+#DEG.enrich.res[is.infinite(DEG.enrich.res$log.q),]$log.q <- 1
+DEG.enrich <- cbind("Upregulated"=DEG.enrich.res[c(seq(1, length(rownames(DEG.enrich.res))-1, by = 2)),][,7],
+                    "Downregulated"=DEG.enrich.res[c(seq(2, length(rownames(DEG.enrich.res)), by = 2)),][,7])
+rownames(DEG.enrich) <- names(gene_panels_subset)
+DEG.enrich[DEG.enrich > 20] <- 20
+ComplexHeatmap::Heatmap(DEG.enrich,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+```
+
+
+
+### DEA boxplots
+```{r genes.int, echo=TRUE, fig.height = 6, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+pca.df_upgraded <- cbind('COiMGxCondition'=as.factor(meta3$condition):as.factor(meta3$COiMg),'Condition'=meta3$condition,pca.df,t(batch.rem3_mod1[rownames(batch.rem3_mod1) %in% 
+                                                                                                                                                          c('FOXJ1',
+                                                                                                                                                            'CLDN5',
+                                                                                                                                                            'IDO1',
+                                                                                                                                                            'GBP5',
+                                                                                                                                                            'MMP10'),]))
+for (i in  c('FOXJ1',
+             'CLDN5',
+             'IDO1',
+             'GBP5',
+             'MMP10')){
+  p <- ggplot(pca.df_upgraded,aes_string(x='COiMGxCondition',y=i, fill='COiMGxCondition')) +
+    #stat_compare_means(method = "t.test", label.y = 2000, label.x = 1.3) +
+    geom_boxplot() +
+    geom_boxplot(width=0.1, fill="white") +
+    scale_fill_brewer(palette="Dark2") +
+    labs(title=paste0("COiMGxCondition ", i, " expression"),x="COiMGxCondition", y = paste0(i,' expression')) +
+    theme_classic()
+  plot(p)
+             }
+
+```
