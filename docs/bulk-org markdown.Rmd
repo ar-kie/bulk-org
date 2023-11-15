@@ -803,6 +803,12 @@ overlap <- rownames(coimg.res[rownames(coimg.res) %in% rownames(IFNy.res),])
 
 cor(coimg.res[rownames(coimg.res) %in% overlap,]$log2FoldChange,IFNy.res[rownames(IFNy.res) %in% overlap,]$log2FoldChange)
 
+
+
+ggscatter(data.frame('Coculture'=coimg.res[rownames(coimg.res) %in% overlap,]$log2FoldChange,'Stimulation'=IFNy.res[rownames(IFNy.res) %in% overlap,]$log2FoldChange), x = "Coculture", y = "Stimulation", add = "reg.line") +
+  stat_cor(label.x = 1, label.y = 10) +
+  stat_regline_equation(label.x = 1, label.y = 11)
+
 createDT(cbind('Genes'=overlap,
                'COiMg'=coimg.res[rownames(coimg.res) %in% overlap,]$log2FoldChange,
                'IFNy'=IFNy.res[rownames(IFNy.res) %in% overlap,]$log2FoldChange), "COiMG", scrollY=1000)
