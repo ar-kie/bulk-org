@@ -10,3 +10,7 @@ Analysis for bulk-org project.
 
 [bulk-org V1.71](https://ar-kie.github.io/bulk-org/docs/11152023_bulk-org-markdown.html). <br/>
 
+12/05/2023: Added line-by-line analysis
+
+[bulk-org V1.82](https://ar-kie.github.io/bulk-org/docs/12052023_bulk-org-markdown.html). <br/>
+
