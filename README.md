@@ -18,3 +18,7 @@ Analysis for bulk-org project.
 
 [bulk-org V1.84](https://ar-kie.github.io/bulk-org/docs/12152023_bulk-org-markdown.html). <br/>
 
+01/17/2024: Added additional figures
+
+[AB figures](https://ar-kie.github.io/bulk-org/docs/01172024_bulk-org-AB-figures.html). <br/>
+
