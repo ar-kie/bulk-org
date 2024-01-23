@@ -22,8 +22,9 @@ Analysis for bulk-org project.
 
 [AB figures](https://ar-kie.github.io/bulk-org/docs/01172024_bulk-org-AB-figures.html). <br/>
 
-01/23/2024: Updated the figures
+01/23/2024: Updated the figures & added single-cell data
 
 [AB figures V1.2](https://ar-kie.github.io/bulk-org/docs/01232024_bulk-org-AB-figures.html). <br/>
 
+[sc-org](https://ar-kie.github.io/bulk-org/docs/01232023_sc-org-figures.html). <br/>
 
