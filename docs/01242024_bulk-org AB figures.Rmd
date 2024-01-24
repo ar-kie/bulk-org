@@ -3,8 +3,9 @@ title: "bulk-org figures (AB) V1.1"
 author: "Raphael Kubler"
 date: "01/24/2024"
 output:
-  pdf_document:
+  html_document:
     toc: yes
+    df_print: paged
   rmarkdown::html_document:
     theme: united
     highlight: tango
@@ -15,9 +16,8 @@ output:
     smooth_scroll: yes
     number_sections: no
     self_contained: yes
-  html_document:
+  pdf_document:
     toc: yes
-    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -494,6 +494,6 @@ ggplot(lfc.plot, aes(x=CO,y=COiMg))+
              color="darkred", fill="blue", se=TRUE) +
   geom_point(shape=18, color="grey")+
   stat_cor(method = "pearson", label.x = 0, label.y = 20)+
-  geom_text_repel(data = lfc.plot, aes(x = CO, y = COiMG, label = Gene), vjust = 3, size = 3) +
+  geom_text_repel(data = lfc.plot, aes(x = CO, y = COiMg, label = Gene), vjust = 3, size = 3) +
   theme_minimal()
 ```
