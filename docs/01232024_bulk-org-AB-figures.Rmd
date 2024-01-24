@@ -3,16 +3,21 @@ title: "bulk-org figures (AB) V1.1"
 author: "Raphael Kubler"
 date: "01/23/2024"
 output:
-  rmarkdown::html_document: 
-   theme: united
-   highlight: tango
-   code_folding: hide
-   toc: true
-   toc_float: true
-   df_print: paged
-   smooth_scroll: true
-   number_sections: false
-   self_contained: true 
+  html_document:
+    toc: yes
+    df_print: paged
+  rmarkdown::html_document:
+    theme: united
+    highlight: tango
+    code_folding: hide
+    toc: yes
+    toc_float: yes
+    df_print: paged
+    smooth_scroll: yes
+    number_sections: no
+    self_contained: yes
+  pdf_document:
+    toc: yes
 ---
 
 ```{r setup, include=FALSE}
