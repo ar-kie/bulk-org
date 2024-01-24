@@ -32,4 +32,4 @@ Analysis for bulk-org project.
 
 [sc-org](https://ar-kie.github.io/bulk-org/docs/01232023_sc-org-figures.html). <br/>
 
-[pdf-files](https://github.com/ar-kie/bulk-org/tree/main/docs). <br/>
+[pdf-files](https://github.com/ar-kie/bulk-org/tree/main/docs/01242024_bulk-org-AB-figures_files/figure-latex). <br/>
