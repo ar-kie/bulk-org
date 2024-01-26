@@ -42,6 +42,10 @@ Analysis for bulk-org project.
 
 [pdf-files](https://github.com/ar-kie/bulk-org/tree/main/docs/01252024_bulk-org-AB-figures_pdf_files/figure-latex). <br/>
 
+01/26/2024: Updated the figures (and added datatables)
+
+[AB figures V1.32](https://ar-kie.github.io/bulk-org/docs/01262024_bulk-org-AB-figures.html). <br/>
+
 
 
 
