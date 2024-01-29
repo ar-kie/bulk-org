@@ -46,6 +46,9 @@ Analysis for bulk-org project.
 
 [AB figures V1.32](https://ar-kie.github.io/bulk-org/docs/01262024_bulk-org-AB-figures.html). <br/>
 
+01/29/2024: Added dreamlet figures
+
+[dreamlet](https://ar-kie.github.io/bulk-org/docs/dreamlet_plots). <br/>
 
 
 
