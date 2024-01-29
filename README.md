@@ -48,7 +48,7 @@ Analysis for bulk-org project.
 
 01/29/2024: Added dreamlet figures
 
-[dreamlet](https://ar-kie.github.io/bulk-org/docs/dreamlet_plots). <br/>
+[dreamlet](https://github.com/ar-kie/bulk-org/tree/main/docs/dreamlet_plots). <br/>
 
 
 
