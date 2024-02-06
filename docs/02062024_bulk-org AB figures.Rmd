@@ -186,7 +186,7 @@ dev.off()
 
 
 ## Enrichment heatmap (gene sets of interest)
-```{r enrich.hm_COvCOiMg, echo=TRUE, fig.height = 6, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+```{r enrich.hm_COvCOiMg, echo=TRUE, fig.height = 6, fig.width = 3, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
 
 ComplexHeatmap::Heatmap(DEG.enrich_coimg[!rownames(DEG.enrich_coimg) %in% 'Lipid metabolism',],
                         cluster_rows = F,
@@ -571,7 +571,7 @@ ggplot(boxplot.g_ifny,aes(x = Gene, y = Expression, fill = Organoids)) +
 
 
 ## Gene set heatmap
-```{r ifny.hm, echo=TRUE, fig.height = 3, fig.width = 3, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+```{r ifny.hm, echo=TRUE, fig.height = 3, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
 
 ra.ifny.comp <- HeatmapAnnotation(
   Organoids = meta.ifny$Organoids,
@@ -690,7 +690,7 @@ lfc.plot <- data.frame('Gene'=new_IFNy$symbol,'CO'=new_IFNy$log2FoldChange,'COiM
 rownames(lfc.plot) <- new_IFNy$symbol
 
 #subset to lFC > abs(1)
-lfc.plot <- lfc.plot[abs(lfc.plot$CO) > 1 | abs(lfc.plot$COiMg) > 1 ,]
+lfc.plot <- lfc.plot[abs(new_IFNy$log2FoldChange) > 1 & new_IFNy$padj < 0.1 | abs(new_coimg_ifny[rownames(new_coimg_ifny) %in% rownames(new_IFNy),]$log2FoldChange) > 1 & new_coimg_ifny[rownames(new_coimg_ifny) %in% rownames(new_IFNy),]$padj < 0.1,]
 
 Gene <- ifelse(rownames(lfc.plot) %in% na.omit(c(gene_panels_subset$Phagocytosis,gene_panels_subset$Microglia,gene_panels_subset$`MHC #Class II`,gene_panels_subset$`Neuroinflammatory I`)), rownames(lfc.plot), "")
 
