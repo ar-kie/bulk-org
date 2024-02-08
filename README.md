@@ -63,6 +63,9 @@ Analysis for bulk-org project.
 
 [dreamlet](https://github.com/ar-kie/bulk-org/tree/main/docs/dreamlet_plots/tiff). <br/>
 
+02/08/2024: updated single-cell
+
+[updated sc-org](https://ar-kie.github.io/bulk-org/docs/02082024_sc-org-figures-1.30.html)
 
 All figures are also available as png here:
 
