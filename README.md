@@ -63,11 +63,13 @@ Analysis for bulk-org project.
 
 [dreamlet](https://github.com/ar-kie/bulk-org/tree/main/docs/dreamlet_plots/tiff). <br/>
 
-02/08/2024: updated single-cell
+02/08/2024: updated single-cell | added pdf
 
 [updated sc-org](https://ar-kie.github.io/bulk-org/docs/02082024_sc-org-figures-1.30.html)
 
 [pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02082024_sc-org-figures-to-pdf.html)
+
+[pdf bulk-org](https://github.com/ar-kie/bulk-org/tree/main/docs/02062024_bulk-org-AB-figures_pdf_files/figure-latex)
 
 
 All figures are also available as png here:
