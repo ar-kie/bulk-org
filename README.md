@@ -72,7 +72,7 @@ Analysis for bulk-org project.
 [pdf bulk-org](https://github.com/ar-kie/bulk-org/tree/main/docs/02062024_bulk-org-AB-figures_pdf_files/figure-latex)
 
 
-02/08/2024: updated single-cell color scheme | added bulk-org single-pdf file with figures
+02/09/2024: updated single-cell color scheme | added bulk-org single-pdf file with figures
 
 [pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02092024_sc-org-pdf-figures.html)
 
