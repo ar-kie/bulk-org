@@ -1,0 +1,163 @@
+---
+title: "sc-org figures (AB) to pdf"
+author: "Raphael Kubler"
+date: "02/09/2024"
+output:
+  pdf_document:
+    toc: yes
+  rmarkdown::html_document:
+    theme: united
+    highlight: tango
+    code_folding: hide
+    toc: yes
+    toc_float: yes
+    df_print: paged
+    smooth_scroll: yes
+    number_sections: no
+    self_contained: no
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(RColorBrewer)
+library(Seurat)
+library(Matrix)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+#library(tinytex, lib.loc = "/usr/local/lib64/R/library")
+
+
+load("/sc/arion/projects/ad-omics/raphael/alice/sc-org/analysis/02082024_V1.30 analysis_final figures.RData")
+```
+
+# Single-cell RNA-seq analysis of COs vs COiMG
+
+## UMAP
+
+```{r annotation, echo=FALSE, fig.height = 6, fig.width = 17, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+SCpubr::do_DotPlot(PV_filt,features=list('Microglia'=AB_markers_curated$Microglia),
+                   group.by = "Organoids") + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+SCpubr::do_DotPlot(PV_filt, features=list('Epithelial'=AB_markers$`Epithelial Cells`,
+                                             'Radial Glia'=AB_markers$`Radial Glia`,
+                                             'NPCs'=AB_markers$NPCs,
+                                          'Neurons'=AB_markers$Neurons,
+                                          'Exc. neurons'=AB_markers$`Excitatory neurons`,
+                                          'Inh. neurons'=AB_markers$`Inhibitory neurons`,
+                                          'Interneurons'=AB_markers$Interneurons,
+                                          'Cortical neurons'=AB_markers$`Cortical neurons`,
+                                          'Mesenchymal'=AB_markers$`Mesenchymal cells`,
+                                          'Oligodendrocytes'=AB_markers$Oligodendrocytes,
+                                          'Astrocytes'=AB_markers$Astrocytes,
+                                          'Microglia'=AB_markers$Microglia,
+                                          'Cilia'=AB_markers$Cilia,
+                                          'ChP'=AB_markers$ChP),
+                   group.by = "seurat_clusters")+ 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+
+
+```
+
+
+```{r umap, echo=FALSE, fig.height = 6, fig.width = 8, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+Idents(PV_filt) <- PV_filt$seurat_clusters
+identity <- c('0'='NPC',
+              '1'='Cortical neurons',
+              '2'='NPC',
+              '3'='NPC',
+              '4'='Mesenchymal/ChP (Cilia-associated)',
+              '5'='NPC',
+              '6'='Microglia',
+              '7'='Microglia')
+PV_filt <- RenameIdents(object = PV_filt, identity)
+PV_filt@meta.data$identity <- Idents(PV_filt)
+table(PV_filt$identity)
+
+PV_filt$identity <- factor(PV_filt$identity, levels=unique(PV_filt$identity))
+
+DimPlot(PV_filt, reduction = 'umap', group.by='identity', cols = RColorBrewer::brewer.pal(7,'Accent')[c(1,2,3,6)])
+
+
+```
+
+```{r umap2, echo=FALSE, fig.height = 6, fig.width = 12, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+DimPlot(PV_filt, reduction = 'umap', group.by='identity', split.by = 'Organoids', cols = RColorBrewer::brewer.pal(7,'Accent')[c(1,2,3,6)])
+DimPlot(PV_filt, reduction = 'umap', group.by='identity', split.by = 'cell.line', cols = RColorBrewer::brewer.pal(7,'Accent')[c(1,2,3,6)])
+table(PV_filt$cell.line,PV_filt$identity)
+```
+
+```{r feature_plots, echo=FALSE, fig.height = 6, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+FeaturePlot(PV_filt,features = 'Cluster1',reduction = 'umap') + 
+  scale_colour_gradientn(colours = c('gray60', 'gray70',brewer.pal(n = 2, name = "OrRd"))) +
+  ggtitle('Microglia markers')
+  
+FeaturePlot(PV_filt,features = 'Cluster2',reduction = 'umap') + 
+  scale_colour_gradientn(colours = c('gray60', 'gray70',brewer.pal(n = 2, name = "OrRd"))) +
+  ggtitle('Mesenchymal/ChP markers')
+
+FeaturePlot(PV_filt,features = 'Cluster3',reduction = 'umap') + 
+  scale_colour_gradientn(colours = c('gray60', 'gray70',brewer.pal(n = 2, name = "OrRd"))) +
+  ggtitle('Neuron markers')
+
+FeaturePlot(PV_filt,features = 'Cluster4',reduction = 'umap') + 
+  scale_colour_gradientn(colours = c('gray60', 'gray70',brewer.pal(n = 2, name = "OrRd"))) +
+  ggtitle('NPC markers')
+
+
+FeaturePlot(PV_filt,features = 'AIF1',reduction = 'umap') + 
+  scale_colour_gradientn(colours =c('gray60', 'gray70',brewer.pal(n = 2, name = "OrRd")))
+FeaturePlot(PV_filt,features = 'TTR',reduction = 'umap') + 
+  scale_colour_gradientn(colours = c('gray60', 'gray70',brewer.pal(n = 2, name = "OrRd")))
+FeaturePlot(PV_filt,features = 'STMN2',reduction = 'umap') + 
+  scale_colour_gradientn(colours = c('gray60', 'gray70',brewer.pal(n = 2, name = "OrRd")))
+FeaturePlot(PV_filt,features = 'VIM',reduction = 'umap') + 
+  scale_colour_gradientn(colours = c('gray60', 'gray70',brewer.pal(n = 2, name = "OrRd")))
+
+
+```
+
+
+```{r markers2, echo=FALSE, fig.height = 6, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+prop <- data.frame('CO'=prop.table(table(PV_filt$identity,PV_filt$Organoids)[,1]),'COiMg'=prop.table(table(PV_filt$identity,PV_filt$Organoids)[,2]))
+
+df <- data.frame('Cell Type'=rep(rownames(prop),2),'Organoids'=c(rep('CO',4),rep('COiMg',4)),'Percentage'=round(c(prop[,1],prop[,2])*100,2))
+
+ggplot(df, aes(x = Organoids, y = Percentage, fill = `Cell.Type`))+
+  geom_bar(stat = "identity")+
+  geom_text(aes(label = paste(Percentage,"%")), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values=RColorBrewer::brewer.pal(7,'Accent')[c(1,2,3,6)]) +
+  theme_minimal()
+
+
+```
+
+```{r markers, echo=FALSE, fig.height = 6, fig.width = 12, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+SCpubr::do_DotPlot(PV_filt, features=list('Microglia'=AB_markers$Microglia,'Cilia'=AB_markers$Cilia,
+                                          'ChP'=AB_markers$ChP),group.by = 'Organoids')+ 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+
+```
+
+
+```{r coimg.DEGs, echo=FALSE, fig.height = 6, fig.width = 12, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+SCpubr::do_DotPlot(PV_filt, features=list('COiMg DEGs'=coimg_degs[[2]][coimg_degs[[2]] %in% rownames(PV_filt)]),group.by = 'identity')+ 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
+
+
+
+
+
+
+
+
+
