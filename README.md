@@ -67,7 +67,7 @@ Analysis for bulk-org project.
 
 [updated sc-org](https://ar-kie.github.io/bulk-org/docs/02082024_sc-org-figures-1.30.html)
 
-[pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02082024_sc-org-figures-to-pdf.html)
+[pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02082024_sc-org-figures-to-pdf.pdf)
 
 [pdf bulk-org](https://github.com/ar-kie/bulk-org/tree/main/docs/02062024_bulk-org-AB-figures_pdf_files/figure-latex)
 
