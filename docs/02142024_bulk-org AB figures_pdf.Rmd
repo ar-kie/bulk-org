@@ -1,0 +1,869 @@
+---
+title: "bulk-org figures (AB) V1.34"
+author: "Raphael Kubler"
+date: "02/09/2024"
+output:
+  pdf_document:
+    toc: yes
+  rmarkdown::html_document:
+    theme: united
+    highlight: tango
+    code_folding: hide
+    toc: yes
+    toc_float: yes
+    df_print: paged
+    smooth_scroll: yes
+    number_sections: no
+    self_contained: no
+  html_document:
+    toc: yes
+    df_print: paged
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+load('~/Documents/R projects/bulk-org/01152024_AB figures analysis.RData')
+load('~/Documents/R projects/bulk-org/data/01252024_AB figures analysis V1.2.RData')
+
+library(tibble)
+library(matrixStats)
+library(factoextra)
+library(broom)
+library(ggpubr)
+library(tidyr)
+library(dplyr)
+library(plyr)
+library(ggeasy)
+library(ggrepel)
+library(gridExtra)
+library(ComplexHeatmap)
+library(DESeq2)
+library(dplyr)
+library(plyr)
+library(clusterProfiler)
+library(tidyr)
+library(biomaRt)
+library(variancePartition)
+library(ggrastr)
+library(kableExtra)
+
+tiff_path <- c('~/Documents/R projects/bulk-org/tiff_plots/')
+```
+
+# PCA IFNy, LPS, ctr
+```{r pca_all, echo = FALSE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+pca_cor3_mod1[pca_cor3_mod1$Line %in% 'MSN38',]$Line <- 'MSN-38'
+pca_cor3_mod1[pca_cor3_mod1$Line %in% 'MSN9',]$Line <- 'MSN-9'
+pca_cor3_mod1[pca_cor3_mod1$Line %in% 'WTC11',]$Line <- 'WTC-11'
+
+pca_cor3_mod1$Organoids <- NA
+pca_cor3_mod1[pca_cor3_mod1$COiMg %in% 'yes',]$Organoids <- 'COiMG'
+pca_cor3_mod1[pca_cor3_mod1$COiMg %in% 'no',]$Organoids <- 'CO'
+
+
+PCAplot(pca_cor3_mod1, "condition", Shape = "Organoids", PoV.df=PoV_cor3_mod1, pc.1 = 1, pc.2 = 2, colors=c('lightgrey','black','#98FB98')) #M30 & M33 are outleirs, let's remove them for now
+
+
+```
+
+
+# CO vs COiMG in control samples
+
+## PCA plots
+```{r pca_COvCOiMg, echo = FALSE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+#pca plots
+
+pca.ctr[pca.ctr$Line %in% 'MSN38',]$Line <- 'MSN-38'
+pca.ctr[pca.ctr$Line %in% 'MSN9',]$Line <- 'MSN-9'
+pca.ctr[pca.ctr$Line %in% 'WTC11',]$Line <- 'WTC-11'
+
+pca.ctr$Organoids <- NA
+pca.ctr[pca.ctr$COiMg %in% 'yes',]$Organoids <- 'COiMG'
+pca.ctr[pca.ctr$COiMg %in% 'no',]$Organoids <- 'CO'
+
+
+PCAplot(pca.ctr, "Organoids", Shape = "Line", PoV.df=PoV.ctr, pc.1 = 1, pc.2 = 2, colors=c('lightgrey','black'))
+
+
+```
+
+## Volcano plot
+
+```{r volcano_COvCOiMg, echo = FALSE, fig.height = 4, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+new_coimg$symbol <- rownames(new_coimg)
+volcano_plot(data.frame(new_coimg), title = 'CO vs COiMg',
+             annotate_by=unlist(AB.genes), ymax1 = 30, ymax2 = 31, xmax1 = -5, xmax2 = 8) + 
+  scale_x_continuous(breaks = c(-5,-3,-1, 0,1,3,5),
+                     labels = c("-5",
+                                '-3',
+                                "-1",
+                                "0",
+                                "1",
+                                '3',
+                                "5"))
+
+```
+
+
+## DEG table
+```{r CO.COiMg_tab, echo = FALSE, message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+ogenes <- readxl::read_xlsx('gene list_cell type.xlsx', col_names = T)
+
+organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','IN','Neuron','Inter','OPC/OL','GPC','NEC 1',
+                               'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
+
+
+deg_co_coimg <- new_coimg[new_coimg$padj < 0.1 & new_coimg$log2FoldChange < -1 | new_coimg$padj < 0.1 & new_coimg$log2FoldChange > 1,]
+
+df.co_coimg <- data.frame('Gene'=rownames(deg_co_coimg),'lFC'=deg_co_coimg$log2FoldChange,'Cilia-associated'=rownames(deg_co_coimg) %in% organoid$CBC)
+
+createDT(data.frame(df.co_coimg), "Status", scrollY=1000)
+
+```
+
+
+## Boxplot CO vs COiMg in CTR
+
+```{r dea_COvCOiMg, echo = FALSE, fig.height = 4, fig.width = 7, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+meta.ctr$Organoids <- NA
+meta.ctr[meta.ctr$COiMg %in% 'yes',]$Organoids <- 'COiMg'
+meta.ctr[meta.ctr$COiMg %in% 'no',]$Organoids <- 'CO'
+
+boxplot1 <- data.frame('Sample'=rownames(meta.ctr),'Organoids'=meta.ctr$Organoids,t(batch.ctr[rownames(batch.ctr) %in% c('C3',"C1QA","CX3CR1","TLR4"),]))
+boxplot2 <- data.frame('Sample'=rownames(meta.ctr),'Organoids'=meta.ctr$Organoids,t(batch.ctr[rownames(batch.ctr) %in% c("CD68","TREM2",'TYROBP',"SYK"),]))
+boxplot3 <- data.frame('Sample'=rownames(meta.ctr),'Organoids'=meta.ctr$Organoids,t(batch.ctr[rownames(batch.ctr) %in% c("SPP1","CSF1R","IRF8"),]))
+boxplot4 <- data.frame('Sample'=rownames(meta.ctr),'Organoids'=meta.ctr$Organoids,t(batch.ctr[rownames(batch.ctr) %in% c("CLDN5","FOXJ1"),]))
+
+# Reshape the data using gather
+expression_1 <- gather(boxplot1, key = "Gene", value = "Expression", -Sample, -Organoids)
+expression_2 <- gather(boxplot2, key = "Gene", value = "Expression", -Sample, -Organoids)
+expression_3 <- gather(boxplot3, key = "Gene", value = "Expression", -Sample, -Organoids)
+expression_4 <- gather(boxplot4, key = "Gene", value = "Expression", -Sample, -Organoids)
+
+
+ggplot(expression_1,aes(x = Gene, y = Expression, fill = Organoids)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Organoids), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","black")) +
+  labs(y = "Standardized expression")
+
+
+ggplot(expression_2,aes(x = Gene, y = Expression, fill = Organoids)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Organoids), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","black")) +
+  labs(y = "Standardized expression")
+
+
+ggplot(expression_3,aes(x = Gene, y = Expression, fill = Organoids)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Organoids), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","black")) +
+  labs(y = "Standardized expression")
+
+
+ggplot(expression_4,aes(x = Gene, y = Expression, fill = Organoids)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Organoids), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","black")) +
+  labs(y = "Standardized expression")
+
+
+```
+
+
+## Patir microglia genes heatmap
+
+```{r hm.microglia_COvCOiMg, echo = FALSE, fig.height = 10, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+ra.ctr <- HeatmapAnnotation(
+  Organoids = meta.ctr$Organoids,
+  col = list(
+    Organoids = c("COiMg"='black','CO'='white')),
+  show_annotation_name = T,
+  show_legend = T)
+
+ComplexHeatmap::Heatmap(t(hm_counts.ctr),
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        top_annotation = ra.ctr,
+                        right_annotation = rowAnnotation(
+                          text = anno_text(colnames(hm_counts.ctr), rot = 0, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
+
+
+```
+
+
+## Enrichment heatmap (gene sets of interest)
+```{r enrich.hm_COvCOiMg, echo = FALSE, fig.height = 6, fig.width = 3, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+ComplexHeatmap::Heatmap(DEG.enrich_coimg[!rownames(DEG.enrich_coimg) %in% 'Lipid metabolism',],
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+
+
+```
+
+## GO enrichment
+
+```{r GO_COvCOiMg, echo = FALSE, fig.height = 12, fig.width = 7, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+dotplot(new_coimg.upregGO, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+dotplot(new_coimg.downregGO, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+
+```
+
+
+# Stimulation (IFNy) samples
+
+## PCA plots
+```{r pca_ifny.CO, echo = FALSE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+pca.ifny[pca.ifny$Line %in% 'MSN38',]$Line <- 'MSN-38'
+pca.ifny[pca.ifny$Line %in% 'MSN9',]$Line <- 'MSN-9'
+pca.ifny[pca.ifny$Line %in% 'WTC11',]$Line <- 'WTC-11'
+
+
+PCAplot(pca.ifny, "condition", Shape = "Line", PoV.df=PoV.ifny, pc.1 = 1, pc.2 = 2, colors = c('lightgrey','#98FB98')) #M30 & M33 are outleirs, let's remove them for now
+
+```
+
+## Volcano plot
+
+```{r volcano_ifny.CO, echo = FALSE,  fig.height = 8, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+new_IFNy$symbol <- rownames(new_IFNy)
+top30.new_IFNy <- c(rownames(new_IFNy[order(new_IFNy$log2FoldChange),][new_IFNy[order(new_IFNy$log2FoldChange),]$padj < 0.05,][1:15,]),
+                    rownames(new_IFNy[order(new_IFNy$log2FoldChange, decreasing = T),][new_IFNy[order(new_IFNy$log2FoldChange, decreasing = T),]$padj < 0.05,][1:15,]))
+
+volcano_plot(data.frame(new_IFNy), title = 'ctr vs IFNy',
+             annotate_by=top30.new_IFNy, ymax1 = 60, ymax2 = 61, xmax1 = -5, xmax2 = 10) + 
+  scale_x_continuous(breaks = c(-5,-3,-1, 0,1,3,5),
+                     labels = c("-5",
+                                '-3',
+                                "-1",
+                                "0",
+                                "1",
+                                '3',
+                                "5"))
+
+
+```
+
+
+## DEG table
+```{r CTRvIFNy.CO_tab, echo = FALSE, message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+ogenes <- readxl::read_xlsx('gene list_cell type.xlsx', col_names = T)
+
+organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','IN','Neuron','Inter','OPC/OL','GPC','NEC 1',
+                               'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
+
+
+deg_ifny <- new_IFNy[new_IFNy$padj < 0.1 & new_IFNy$log2FoldChange < -1 | new_IFNy$padj < 0.1 & new_IFNy$log2FoldChange > 1,]
+
+df.CO <- data.frame('Gene'=rownames(deg_ifny),'lFC'=deg_ifny$log2FoldChange,'Cilia-associated'=rownames(deg_ifny) %in% organoid$CBC)
+createDT(data.frame(df.CO), "Status", scrollY=1000)
+
+```
+
+## Boxplot genes of interest
+
+```{r boxplots_ifny.CO, echo = FALSE, fig.height = 4, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+meta.CO[meta.CO$Line %in% 'MSN38',]$Line <- 'MSN-38'
+meta.CO[meta.CO$Line %in% 'MSN9',]$Line <- 'MSN-9'
+meta.CO[meta.CO$Line %in% 'WTC11',]$Line <- 'WTC-11'
+
+boxplot.g_ifny_down <- boxplot.g_ifny[boxplot.g_ifny$Sample %in% rownames(meta.CO[!meta.CO$condition %in% 'LPS',]),]
+boxplot.g_ifny_down <- boxplot.g_ifny_down[,colnames(boxplot.g_ifny_down) %in% c("CLDN5","IGF1","Stimulation","Sample")]
+boxplot.g_ifny_down <- gather(boxplot.g_ifny_down, key = "Gene", value = "Expression", -Sample, -Stimulation)
+
+boxplot.g_ifny_up <- boxplot.g_ifny[boxplot.g_ifny$Sample %in% rownames(meta.CO[!meta.CO$condition %in% 'LPS',]),]
+boxplot.g_ifny_up <- boxplot.g_ifny_up[,!colnames(boxplot.g_ifny_up) %in% c("CLDN5","IGF1")]
+boxplot.g_ifny_up <- gather(boxplot.g_ifny_up, key = "Gene", value = "Expression", -Sample, -Stimulation)
+
+
+ggplot(boxplot.g_ifny_down,aes(x = Gene, y = Expression, fill = Stimulation)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Stimulation), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","#98FB98")) +
+  labs(y = "Standardized expression")
+ggplot(boxplot.g_ifny_up,aes(x = Gene, y = Expression, fill = Stimulation)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Stimulation), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","#98FB98")) +
+  labs(y = "Standardized expression")
+
+
+```
+
+
+## Top 40 DEGs heatmap
+
+```{r topDEG.hm_ifny.CO, echo = FALSE, fig.height = 10, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+ra.ifny <- HeatmapAnnotation(
+  Condition = meta.CO[!meta.CO$condition %in% 'LPS',]$condition,
+  col = list(
+    Condition = c("IFNg"='#98FB98','ctrl'='white')),
+  show_annotation_name = T,
+  show_legend = T)
+
+top50.new_IFNy <- c(rownames(new_IFNy[order(new_IFNy$log2FoldChange),][new_IFNy[order(new_IFNy$log2FoldChange),]$padj < 0.05,][1:20,]),
+                    rownames(new_IFNy[order(new_IFNy$log2FoldChange, decreasing = T),][new_IFNy[order(new_IFNy$log2FoldChange, decreasing = T),]$padj < 0.05,][1:20,]))
+
+hm_counts.ifny <- t(scale(t(batch.ifny[rownames(batch.ifny) %in% top50.new_IFNy,])))
+
+ComplexHeatmap::Heatmap(hm_counts.ifny,
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        top_annotation = ra.ifny,
+                        right_annotation = rowAnnotation(
+                          text = anno_text(rownames(hm_counts.ifny), rot = 0, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
+
+
+```
+
+
+## Enrichment heatmap (gene sets of interest)
+```{r enrichment.hm_ifny.CO, echo = FALSE, fig.height = 6, fig.width = 3, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+ComplexHeatmap::Heatmap(DEG.enrich_ifny[!rownames(DEG.enrich_ifny) %in% 'Lipid metabolism',],
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+
+
+
+```
+
+
+## GO enrichment
+
+```{r GO.ifny.CO, echo = FALSE, fig.height = 12, fig.width = 7, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+dotplot(new_IFNy.upregGO, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+dotplot(new_IFNy.downregGO, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+
+```
+
+
+# IFNy in COiMG
+
+## PCA plots
+```{r pca_coimg.ifny, echo = FALSE, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+#pca plots
+meta.COiMG <- meta[meta$COiMg %in% 'yes',]
+counts.COiMG <- bulkorg_counts[,colnames(bulkorg_counts) %in% rownames(meta.COiMG[!meta.COiMG$condition %in% 'LPS',])]
+
+dds.coimg <- DESeqDataSetFromMatrix(countData = round(counts.COiMG),
+                                   colData = meta.COiMG[!meta.COiMG$condition %in% 'LPS',],
+                                   design = ~ Line  + RIN + batch + `X260.280` + `X260.230` + condition) # RIN + Line + Age + `260/230` + `260/280` + 
+
+
+coimg.vsd <- vst(dds.coimg)
+transformed.coimg <- data.frame(assay(coimg.vsd), check.names=F)
+
+
+batch.coimg <- removeBatchEffect(transformed.coimg, batch = meta.COiMG[!meta.COiMG$condition %in% 'LPS',]$Line, 
+                                covariates=as.matrix(cbind(
+                                  meta.COiMG[!meta.COiMG$condition %in% 'LPS',]$`X260.280`,
+                                  meta.COiMG[!meta.COiMG$condition %in% 'LPS',]$`X260.230`,
+                                  meta.COiMG[!meta.COiMG$condition %in% 'LPS',]$RIN,
+                                  meta.COiMG[!meta.COiMG$condition %in% 'LPS',]$batch)),
+                                design=model.matrix(~ meta.COiMG[!meta.COiMG$condition %in% 'LPS',]$condition))
+
+pca.coimg <- plotPCA.custom(as.matrix(batch.coimg), intgroup=c("condition", "Line"), 
+                           ntop = 500, returnData=TRUE, metadata=meta.COiMG[!meta.COiMG$condition %in% 'LPS',], pc.1 = 1, pc.2 = 3)
+PoV.coimg <- round(100 * attr(pca.coimg, "percentVar"))
+
+
+pca.coimg[pca.coimg$Line %in% 'MSN38',]$Line <- 'MSN-38'
+pca.coimg[pca.coimg$Line %in% 'MSN9',]$Line <- 'MSN-9'
+pca.coimg[pca.coimg$Line %in% 'WTC11',]$Line <- 'WTC-11'
+
+PCAplot(pca.coimg, "condition", Shape = "Line", PoV.df=PoV.coimg, pc.1 = 1, pc.2 = 2, colors=c('lightgrey','#98FB98'))
+
+
+```
+
+## Volcano plot
+
+```{r volcano_ifny.coimg, echo = FALSE, fig.height = 9, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+load("/Users/kubler01/Documents/R projects/bulk-org/01232024_figures AB_ifny in coimg.RData")
+
+
+volcano_plot(data.frame(new_coimg_ifny), title = 'ctr vs IFNy in COiMg',
+             annotate_by=top30.new_coimg_ifny, ymax1 = 80, ymax2 = 81, xmax1 = -5, xmax2 = 15) + 
+  scale_x_continuous(breaks = c(-5,-3,-1, 0,1,3,5),
+                     labels = c("-5",
+                                '-3',
+                                "-1",
+                                "0",
+                                "1",
+                                '3',
+                                "5"))
+
+
+```
+
+
+## DEG table
+```{r CTRvIFNy.COiMg_tab, echo = FALSE, message = FALSE, warning=FALSE, eval=TRUE}
+setwd('/Users/kubler01/Documents/R projects/gene lists/organoids')
+ogenes <- readxl::read_xlsx('gene list_cell type.xlsx', col_names = T)
+
+organoid <- ogenes[,colnames(ogenes) %in% c('CN 1','CN 2','CN 3','CN 4','CN 5','IN','Neuron','Inter','OPC/OL','GPC','NEC 1',
+                               'NEC 2','NEC 3','NEC 4','AS1','AS2','AS3','PGC 1','PGC 2','BRC','CBC','UPRC1','UPRC2')][-1,]
+
+
+deg_ifny.coimg <- new_coimg_ifny[new_coimg_ifny$padj < 0.1 & new_coimg_ifny$log2FoldChange < -1 | new_coimg_ifny$padj < 0.1 & new_coimg_ifny$log2FoldChange > 1,]
+
+df.COiMg <- data.frame('Gene'=rownames(deg_ifny.coimg),'lFC'=deg_ifny.coimg$log2FoldChange,'Cilia-associated'=rownames(deg_ifny.coimg) %in% organoid$CBC)
+createDT(data.frame(df.COiMg), "Status", scrollY=1000)
+
+```
+
+
+## Boxplot genes of interest
+
+```{r ifny_boxplot.coimg, echo = FALSE, fig.height = 4, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+meta.COiMG[meta.COiMG$Line %in% 'MSN38',]$Line <- 'MSN-38'
+meta.COiMG[meta.COiMG$Line %in% 'MSN9',]$Line <- 'MSN-9'
+meta.COiMG[meta.COiMG$Line %in% 'WTC11',]$Line <- 'WTC-11'
+
+
+boxplot.g_ifny.coimg <- data.frame('Sample'=rownames(meta.COiMG[!meta.COiMG$condition %in% 'LPS',]),'Stimulation'=meta.COiMG[!meta.COiMG$condition %in% 'LPS',]$condition,
+                             t(batch.coimg[rownames(batch.coimg) %in% c('IGF1','IDO1', 'GBP5', 'CLDN5', 'CXCL9', 'CXCL10'),]))
+
+boxplot.g_ifny_down.coimg <- boxplot.g_ifny.coimg[boxplot.g_ifny.coimg$Sample %in% rownames(meta.COiMG[!meta.COiMG$condition %in% 'LPS',]),]
+boxplot.g_ifny_down.coimg <- boxplot.g_ifny_down.coimg[,colnames(boxplot.g_ifny_down.coimg) %in% c("CLDN5","IGF1","Stimulation","Sample")]
+boxplot.g_ifny_down.coimg <- gather(boxplot.g_ifny_down.coimg, key = "Gene", value = "Expression", -Sample, -Stimulation)
+
+boxplot.g_ifny_up.coimg <- boxplot.g_ifny.coimg[boxplot.g_ifny.coimg$Sample %in% rownames(meta.COiMG[!meta.COiMG$condition %in% 'LPS',]),]
+boxplot.g_ifny_up.coimg <- boxplot.g_ifny_up.coimg[,!colnames(boxplot.g_ifny_up.coimg) %in% c("CLDN5","IGF1")]
+boxplot.g_ifny_up.coimg <- gather(boxplot.g_ifny_up.coimg, key = "Gene", value = "Expression", -Sample, -Stimulation)
+
+
+ggplot(boxplot.g_ifny_down.coimg,aes(x = Gene, y = Expression, fill = Stimulation)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Stimulation), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","#98FB98")) +
+  labs(y = "Standardized expression")
+ggplot(boxplot.g_ifny_up.coimg,aes(x = Gene, y = Expression, fill = Stimulation)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Stimulation), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","#98FB98")) +
+  labs(y = "Standardized expression")
+
+
+```
+
+## Top 40 DEGs heatmap
+
+```{r topDEG.hm_ifny.coimg, echo = FALSE, fig.height = 10, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+ra.ifny.coimg <- HeatmapAnnotation(
+  Condition = meta.COiMG[!meta.COiMG$condition %in% 'LPS',]$condition,
+  col = list(
+    Condition = c("IFNg"='#98FB98','ctrl'='white')),
+  show_annotation_name = T,
+  show_legend = T)
+
+top50.new_IFNy.coimg <- c(rownames(new_coimg_ifny[order(new_coimg_ifny$log2FoldChange),][new_coimg_ifny[order(new_coimg_ifny$log2FoldChange),]$padj < 0.05,][1:25,]),
+                    rownames(new_coimg_ifny[order(new_coimg_ifny$log2FoldChange, decreasing = T),][new_coimg_ifny[order(new_coimg_ifny$log2FoldChange, decreasing = T),]$padj < 0.05,][1:25,]))
+
+hm_counts.ifny.coimg <- t(scale(t(batch.coimg[rownames(batch.coimg) %in% top50.new_IFNy.coimg,])))
+
+ComplexHeatmap::Heatmap(hm_counts.ifny.coimg,
+                        cluster_rows = T,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        top_annotation = ra.ifny.coimg,
+                        right_annotation = rowAnnotation(
+                          text = anno_text(rownames(hm_counts.ifny.coimg), rot = 0, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Z-score expression")
+
+```
+
+
+## Enrichment heatmap (gene sets of interest)
+```{r enrich.hm_ifny.coimg, echo = FALSE, fig.height = 6, fig.width = 3, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+ComplexHeatmap::Heatmap(DEG.enrich_ifny.coimg,
+                        cluster_rows = F,
+                        cluster_columns = F,
+                        show_row_dend = F,
+                        show_column_dend = F,
+                        show_row_names = T,
+                        col = colorRampPalette(RColorBrewer::brewer.pal(9,"Blues"))(30),
+                        name = "log2(q)",
+)
+
+
+```
+
+## GO enrichment
+
+```{r GO_ifny.coimg, echo = FALSE, fig.height = 12, fig.width = 7, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+dotplot(new_IFNy.upregGO, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+dotplot(new_IFNy.downregGO, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
+
+
+```
+
+
+# CO vs COiMg under IFNy
+
+## Phagocytosis: CO vs COiMg under IFNy
+```{r phago.ifny, echo = FALSE, fig.height = 4, fig.width = 5, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+meta.ifny <- meta[meta$condition %in% 'IFNg',]
+
+meta.ifny$Organoids <- NA
+meta.ifny[meta.ifny$COiMg %in% 'yes',]$Organoids <- 'COiMg'
+meta.ifny[meta.ifny$COiMg %in% 'no',]$Organoids <- 'CO'
+
+
+counts.ifny <- bulkorg_counts[,colnames(bulkorg_counts) %in% rownames(meta.ifny)]
+dds.ifny <- DESeqDataSetFromMatrix(countData = round(counts.ifny),
+                              colData = meta.ifny,
+                              design = ~ Line  + RIN + batch + `X260.280` + `X260.230` + COiMg) # RIN + Line + Age + `260/230` + `260/280` + 
+
+ifn.vsd <- vst(dds.ifny)
+transformed.ifny <- data.frame(assay(ifn.vsd), check.names=F)
+
+
+batch.ifny <- removeBatchEffect(transformed.ifny, batch = meta.ifny$Line, 
+                                     covariates=as.matrix(cbind(
+                                       meta.ifny$`X260.280`,
+                                       meta.ifny$`X260.230`,
+                                       meta.ifny$RIN,
+                                       meta.ifny$batch)),
+                                     design=model.matrix(~ meta.ifny$COiMg))
+
+
+boxplot.g_ifny <- data.frame('Sample'=rownames(meta.ifny),'Organoids'=meta.ifny$Organoids,
+                             t(batch.ifny[rownames(batch.ifny) %in% AB.genes$PHAGO,]))
+boxplot.g_ifny <- gather(boxplot.g_ifny, key = "Gene", value = "Expression", -Sample, -Organoids)
+
+
+
+ggplot(boxplot.g_ifny,aes(x = Gene, y = Expression, fill = Organoids)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Organoids), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","black")) +
+  labs(y = "Standardized expression")
+
+
+boxplot.g_ifny2 <- data.frame('Sample'=rownames(meta.ifny),'Organoids'=meta.ifny$Organoids,
+                             t(batch.ifny[rownames(batch.ifny) %in% c('CLDN5', 'IGF1', 'FOXJ1' , 'TTR'),]))
+boxplot.g_ifny2 <- gather(boxplot.g_ifny2, key = "Gene", value = "Expression", -Sample, -Organoids)
+
+
+
+ggplot(boxplot.g_ifny2,aes(x = Gene, y = Expression, fill = Organoids)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Organoids), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","black")) +
+  labs(y = "Standardized expression")
+
+```
+
+
+## Gene set heatmap
+```{r ifny.hm, echo = FALSE, fig.height = 3, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+ra.ifny.comp <- HeatmapAnnotation(
+  Organoids = meta.ifny$Organoids,
+  col = list(
+    Organoids = c("COiMg"='black','CO'='white')),
+  show_annotation_name = T,
+  show_legend = T)
+
+
+hm_counts.ifny.comap1 <- scale(t(batch.ifny[rownames(batch.ifny) %in% c(gene_panels_subset$Phagocytosis),]))
+
+#la.ifny.comp <- rowAnnotation(colnames(hm_counts.ifny.comap), #list('Phagocytosis'=gene_panels_subset$Phagocytosis,'Microglia'=gene_panels_subset$Microglia,'MHC Class II'=gene_panels_subset$`MHC #Class II`,'Neuroinflammatory I'=gene_panels_subset$`Neuroinflammatory I`),
+#                              col = c('Phagocytosis'='red'))
+
+print('Phagocytic heatmap')
+ComplexHeatmap::Heatmap(t(hm_counts.ifny.comap1),
+                        cluster_rows = F,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        top_annotation = ra.ifny.comp,
+                        #right_annotation = rowAnnotation(
+                        #  text = anno_text(colnames(hm_counts.ifny.comap1), rot = 0, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Phago Z-score expression")
+
+print('Microglia heatmap')
+
+hm_counts.ifny.comap2 <- scale(t(batch.ifny[rownames(batch.ifny) %in% c(gene_panels_subset$Microglia),]))
+
+ComplexHeatmap::Heatmap(t(hm_counts.ifny.comap2),
+                        cluster_rows = F,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        top_annotation = ra.ifny.comp,
+                        #right_annotation = rowAnnotation(
+                        #  text = anno_text(colnames(hm_counts.ifny.comap2), rot = 0, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Microglia Z-score expression")
+
+print('Sensome heatmap')
+
+hm_counts.ifny.comap3 <- scale(t(batch.ifny[rownames(batch.ifny) %in% c(gene_panels_subset$`MHC Class II`),]))
+
+ComplexHeatmap::Heatmap(t(hm_counts.ifny.comap3),
+                        cluster_rows = F,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        top_annotation = ra.ifny.comp,
+                        #right_annotation = rowAnnotation(
+                        #  text = anno_text(colnames(hm_counts.ifny.comap3), rot = 0, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "Sensome Z-score expression")
+
+print('Neuroinflammatory I heatmap')
+
+hm_counts.ifny.comap4 <- scale(t(batch.ifny[rownames(batch.ifny) %in% c(gene_panels_subset$`Neuroinflammatory I`),]))
+
+ComplexHeatmap::Heatmap(t(hm_counts.ifny.comap4),
+                        cluster_rows = F,
+                        cluster_columns = T,
+                        show_row_dend = T,
+                        show_column_dend = T,
+                        show_row_names = F,
+                        show_column_names = F,
+                        top_annotation = ra.ifny.comp,
+                        #right_annotation = rowAnnotation(
+                        #  text = anno_text(colnames(hm_counts.ifny.comap4), rot = 0, just = "left",gp=gpar(fontsize=8))),
+                        col = colorRampPalette(rev(RColorBrewer::brewer.pal(9,"RdBu")))(10),
+                        name = "NF I Z-score expression")
+
+```
+## IFNy CO vs COiMG
+
+```{r ifny_COvCOiMg, echo = FALSE, fig.height = 6, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+ctr_CO <- batch.rem3_mod1[,colnames(batch.rem3_mod1) %in% rownames(meta[meta$COiMg %in% "no" & meta$condition %in% "IFNg",])]
+ctr_COiMG <- batch.rem3_mod1[,colnames(batch.rem3_mod1) %in% rownames(meta[meta$COiMg %in% "yes" & meta$condition %in% "IFNg",])]
+cor(ctr_CO,ctr_COiMG)
+
+df1 <- data.frame('CO'=rowMeans(ctr_CO))
+df2 <- data.frame('COiMg'=rowMeans(ctr_COiMG))
+
+df.plot <- cbind(df1,df2)
+
+quantile(as.matrix(df1-df2))
+rownames(df.plot)[df1-df2 >= 1 | df1-df2 <= -4]
+
+Gene <- ifelse(rownames(df.plot) %in% rownames(df.plot)[df1-df2 >= 1 | df1-df2 <= -4], rownames(df.plot), "")
+
+ggplot(df.plot, aes(x=CO,y=COiMg))+
+  geom_point() +
+  labs(title = "Expression overlap CO vs COiMg under IFNy stimulation",
+       x = "Standardized CO counts",
+       y = "Standardized COiMg counts") +
+  geom_smooth(method=lm,  linetype="dashed",
+             color="darkred", fill="blue", se=TRUE) +
+  geom_point(shape=18, color="grey")+
+  stat_cor(method = "pearson", label.x = 0, label.y = 20)+
+  geom_text_repel(data = df.plot, aes(x = CO, y = COiMg, label = Gene), vjust = 3, size = 3) +
+  theme_minimal()
+
+
+```
+
+## CO vs COiMg lFC correlation plot
+```{r ifny.coimg_cor, echo = FALSE, fig.height = 6, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+new_IFNy$symbol <- rownames(new_IFNy)
+lfc.plot <- data.frame('Gene'=new_IFNy$symbol,'CO'=new_IFNy$log2FoldChange,'COiMg'=new_coimg_ifny[rownames(new_coimg_ifny) %in% rownames(new_IFNy),]$log2FoldChange)
+rownames(lfc.plot) <- new_IFNy$symbol
+
+#subset to lFC > abs(1)
+lfc.plot <- lfc.plot[abs(new_IFNy$log2FoldChange) > 1 & new_IFNy$padj < 0.1 | abs(new_coimg_ifny[rownames(new_coimg_ifny) %in% rownames(new_IFNy),]$log2FoldChange) > 1 & new_coimg_ifny[rownames(new_coimg_ifny) %in% rownames(new_IFNy),]$padj < 0.1,]
+
+Gene <- ifelse(rownames(lfc.plot) %in% na.omit(c(gene_panels_subset$Phagocytosis,gene_panels_subset$Microglia,gene_panels_subset$`MHC #Class II`,gene_panels_subset$`Neuroinflammatory I`)), rownames(lfc.plot), "")
+
+ggplot(lfc.plot, aes(x=CO,y=COiMg))+
+  geom_point() +
+  labs(title = "lFC correlation in CO & COiMg under IFNy stimulation",
+       x = "lFC IFNy in CO",
+       y = "lFC IFNy in COiMg") +
+  geom_smooth(method=lm,  linetype="dashed",
+             color="darkred", fill="blue", se=TRUE) +
+  geom_point(shape=18, color="grey")+
+  stat_cor(method = "pearson", label.x = 0, label.y = 10)+
+  geom_text_repel(data = lfc.plot, aes(x = CO, y = COiMg, label = Gene), vjust = 3, size = 3) +
+  theme_minimal()
+```
+
+
+# SFARI response to IFNy
+```{r ndd.ifny, echo = FALSE, fig.height = 6, fig.width = 8, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+cgenes <- readxl::read_xlsx('/Users/kubler01/Documents/R projects/gene lists/ndd/Gene lists for organoid paper.xlsx', col_names = T)
+
+sfari <- cgenes$`SFARI high confidence`
+#coimg ifny
+sfari_coimg <- sfari[sfari %in% new_coimg_ifny[abs(new_coimg_ifny$log2FoldChange) > 1 & new_coimg_ifny$padj < 0.1,]$symbol]
+#co ifny
+sfari_co <- sfari[sfari %in% new_IFNy[abs(new_IFNy$log2FoldChange) > 1 & new_IFNy$padj < 0.1,]$symbol]
+
+
+sfari_coimg_bp <- data.frame('Sample'=rownames(meta.COiMG[!meta.COiMG$condition %in% 'LPS',]),'Stimulation'=meta.COiMG[!meta.COiMG$condition %in% 'LPS',]$condition,t(batch.coimg[rownames(batch.coimg) %in% c(sfari_coimg),]))
+
+sfari_co_bp <- data.frame('Sample'=rownames(meta.CO[!meta.CO$condition %in% 'LPS',]),'Stimulation'=meta.CO[!meta.CO$condition %in% 'LPS',]$condition, t(batch.ifny[rownames(batch.ifny) %in% c(sfari_co),]))
+
+
+# Reshape the data using gather
+sfari_coimg_bp_exp <- gather(sfari_coimg_bp, key = "Gene", value = "Expression", -Sample, -Stimulation)
+sfari_co_bp_exp <- gather(sfari_co_bp, key = "Gene", value = "Expression", -Sample, -Stimulation)
+
+
+ggplot(sfari_coimg_bp_exp,aes(x = Gene, y = Expression, fill = Stimulation)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Stimulation), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","#98FB98")) +
+  labs(y = "Standardized expression")
+
+
+ggplot(sfari_co_bp_exp,aes(x = Gene, y = Expression, fill = Stimulation)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
+  geom_point(aes(fill = Stimulation), size = 3, shape = 21, position = position_jitterdodge(dodge.width = 0.8, jitter.height = 0.2, jitter.width = 0.01)) +
+  theme_minimal() + 
+  scale_fill_manual(values=c("white","#98FB98")) +
+  labs(y = "Standardized expression")
+
+```
+
+# iMG vs ocMG
+
+```{r iMGvocMG, echo = FALSE, fig.height = 6, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+#==========iMG - COiMG correlation===============+#
+#integrate iMG with COiMG
+load('/Users/kubler01/Documents/R projects/bulk-org/data/Psamples_gene_matrix.RData')
+
+meta_p <- data.frame(readxl::read_xlsx('/Users/kubler01/Documents/R projects/bulk-org/meta_P.xlsx'))
+counts_p <- genes_counts[,colnames(genes_counts) %in% meta_p$ID]
+counts_P.filt <- counts_p[rownames(counts_p) %in% counts_protcod2,]
+rownames(counts_P.filt) <- make.unique(protcod_genes_reduced[,2])
+#filter genes on expression
+gene_names <- rownames(counts_P.filt)
+cpm = edgeR::cpm(counts_P.filt)
+median_genes_cpm <- enframe(rowMedians(as.matrix(counts_P.filt)), name = "Gene", value = "median_cpm")
+median_genes_cpm <- cbind(median_genes_cpm, gene_names)
+keep.exp <- dplyr::filter(median_genes_cpm, median_cpm > 1)
+keep.exp <- keep.exp$gene_names
+
+counts_P.filt2 <- counts_P.filt[keep.exp,]
+
+
+dds.P <- DESeqDataSetFromMatrix(countData = round(counts_P.filt2),
+                                   colData = meta_p,
+                                   design = ~ RIN + `X260.280` + `X260.230` + type) # RIN + Line + Age + `260/230` + `260/280` + 
+
+vsd.p <- vst(dds.P)
+transformed.p <- data.frame(assay(vsd.p), check.names=F)
+
+
+batch.p <- removeBatchEffect(transformed.p, 
+                                covariates=as.matrix(cbind(
+                                  meta_p$`X260.280`,
+                                  meta_p$`X260.230`,
+                                  meta_p$RIN)),
+                                design=model.matrix(~ meta_p$type))
+
+
+iMG <- batch.p[,colnames(batch.p) %in% meta_p[meta_p$type %in% 'iMG',]$ID]
+ocMG <- batch.p[,colnames(batch.p) %in% meta_p[meta_p$type %in% 'ocMG',]$ID]
+
+
+
+df1 <- data.frame('iMG'=rowMeans(iMG))
+df2 <- data.frame('ocMG'=rowMeans(ocMG))
+
+df.plot <- cbind(df1,df2)
+
+
+load("/Users/kubler01/Documents/R projects/bulk-org/01262024_figures AB_ocMg vs iMg.RData")
+
+Gene <- ifelse(rownames(df.plot) %in% top30.new.p, rownames(df.plot), "")
+
+ggplot(df.plot, aes(x=iMG,y=ocMG))+
+  geom_point() +
+  labs(title = "Expression overlap iMG and ocMG",
+       x = "Standardized iMG counts",
+       y = "Standardized ocMG counts") +
+  geom_smooth(method=lm,  linetype="dashed",
+             color="darkred", fill="blue", se=TRUE) +
+  geom_point(shape=18, color="grey")+
+  stat_cor(method = "pearson", label.x = 0, label.y = 20)+
+  geom_text_repel(data = df.plot, aes(x = iMG, y = ocMG, label = Gene), vjust = 3, size = 3) +
+  theme_minimal()
+
+
+```
+
+```{r volcano_ocMgviMg, echo = FALSE, fig.height = 4, fig.width = 6, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+volcano_plot(data.frame(new_p), title = 'iMg vs ocMg',
+             annotate_by=top30.new.p, ymax1 = 20, ymax2 = 21, xmax1 = -10, xmax2 = 10) + 
+  scale_x_continuous(breaks = c(-10,-5,-2,-1,0,1,2,5,10),
+                     labels = c("-10",
+                                "-5",
+                                '-2',
+                                "-1",
+                                "0",
+                                "1",
+                                '2',
+                                "5",
+                                "10"))
+
+```
+
