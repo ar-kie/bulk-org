@@ -74,15 +74,15 @@ Analysis for bulk-org project.
 
 02/09/2024: updated single-cell color scheme | added bulk-org single-pdf file with figures
 
-[pdf sc-org](https://github.com/ar-kie/bulk-org/tree/main/docs/02092024_sc-org-pdf-figures.pdf)
+[pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02092024_sc-org-pdf-figures.pdf)
 
-[pdf bulk-org](https://github.com/ar-kie/bulk-org/tree/main/docs/02092024_bulk-org-AB-figures_pdf.pdf)
+[pdf bulk-org](https://ar-kie.github.io/bulk-org/docs/02092024_bulk-org-AB-figures_pdf.pdf)
 
 02/14/2024: final requests are in
 
-[pdf sc-org](https://github.com/ar-kie/bulk-org/tree/main/docs/02142024_sc-org-figures-to-pdf.pdf)
+[pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02142024_sc-org-figures-to-pdf.pdf)
 
-[pdf bulk-org](https://github.com/ar-kie/bulk-org/tree/main/docs/02142024_bulk-org-AB-figures_pdf.pdf)
+[pdf bulk-org](https://ar-kie.github.io/bulk-org/docs/02142024_bulk-org-AB-figures_pdf.pdf)
 
 [dreamlet](https://github.com/ar-kie/bulk-org/tree/main/docs/dreamlet_plots/02092024_tiff). <br/>
 
