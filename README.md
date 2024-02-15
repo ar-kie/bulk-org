@@ -86,7 +86,7 @@ Analysis for bulk-org project.
 
 [dreamlet](https://github.com/ar-kie/bulk-org/tree/main/docs/dreamlet_plots/02092024_tiff). <br/>
 
-02/14/2024: final requests are in
+02/15/2024: final requests are in
 
 [pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02152024_sc-org-figures-to-pdf.pdf)
 
