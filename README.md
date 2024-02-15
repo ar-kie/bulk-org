@@ -78,13 +78,18 @@ Analysis for bulk-org project.
 
 [pdf bulk-org](https://ar-kie.github.io/bulk-org/docs/02092024_bulk-org-AB-figures_pdf.pdf)
 
-02/14/2024: final requests are in
+02/14/2024: added cell-type score
 
 [pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02142024_sc-org-figures-to-pdf.pdf)
 
 [pdf bulk-org](https://ar-kie.github.io/bulk-org/docs/02142024_bulk-org-AB-figures_pdf.pdf)
 
 [dreamlet](https://github.com/ar-kie/bulk-org/tree/main/docs/dreamlet_plots/02092024_tiff). <br/>
+
+02/14/2024: final requests are in
+
+[pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02152024_sc-org-figures-to-pdf.pdf)
+
 
 All figures are also available as png here:
 
