@@ -92,7 +92,7 @@ Analysis for bulk-org project.
 
 02/22/2024: final requests are in
 
-[pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02222024_sc-org-figures-to-pdf.pdf)
+[pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02222024_bulk-org-AB-figures_pdf.pdf)s
 
 
 All figures are also available as png here:
