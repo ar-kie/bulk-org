@@ -90,9 +90,9 @@ Analysis for bulk-org project.
 
 [pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02152024_sc-org-figures-to-pdf.pdf)
 
-02/22/2024: final requests are in
+02/22/2024: updated figure requests
 
-[pdf sc-org](https://ar-kie.github.io/bulk-org/docs/02222024_bulk-org-AB-figures_pdf.pdf)s
+[pdf bulk](https://ar-kie.github.io/bulk-org/docs/02222024_bulk-org-AB-figures_pdf.pdf)
 
 
 All figures are also available as png here:
