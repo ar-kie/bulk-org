@@ -94,6 +94,12 @@ Analysis for bulk-org project.
 
 [pdf bulk](https://ar-kie.github.io/bulk-org/docs/02222024_bulk-org-AB-figures_pdf.pdf)
 
+02/23/2024: updated figure requests
+
+[pdf bulk](https://ar-kie.github.io/bulk-org/docs/02222024_bulk-org-AB-figures_pdf.pdf)
+
+[pdf dreamlet](https://github.com/ar-kie/bulk-org/tree/main/docs/dreamlet_plots/02232024_pdf)
+
 
 All figures are also available as png here:
 

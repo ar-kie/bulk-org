@@ -932,13 +932,16 @@ meta[meta$COiMg %in% 'no',]$Organoids <- 'CO'
 meta.noLPS <- meta[!meta$condition %in% 'LPS',]
 batch.noLPS <- batch.rem3_mod1[,colnames(batch.rem3_mod1) %in% rownames(meta.noLPS)]
 
-all_bp <- data.frame('Sample'=rownames(meta.noLPS),'Condition'=interaction(meta.noLPS$condition,meta.noLPS$Organoids),t(batch.noLPS[rownames(batch.noLPS) %in% c('FOXJ1','CLDN5','TTR','IGF1','TEML2','AMBN','OLIG1','OLIG2','OLIG3','NKX2-2','APLNR','BARHL1',
+all_bp <- data.frame('Sample'=rownames(meta.noLPS),'Condition'=interaction(meta.noLPS$condition,meta.noLPS$Organoids),t(batch.noLPS[rownames(batch.noLPS) %in% c('FOXJ1','CLDN5','TTR','IGF1','TREML2','AMBN','OLIG1','OLIG2','OLIG3','NKX2-2','APLNR','BARHL1',
                                                                                                                                                     'HPSE2','SKOR2','GSX1'),]))
 
+all_bp <- all_bp[,match(c('Sample','Condition',c('FOXJ1','CLDN5','TTR','IGF1','TREML2','AMBN','OLIG1','OLIG2','OLIG3','NKX2.2','APLNR','BARHL1',
+                                                                                                                                                    'HPSE2','SKOR2','GSX1')),colnames(all_bp))]
 
 
 # Reshape the data using gather
-allbp_exp <- gather(all_bp, key = "Gene", value = "Expression", -Sample, -Condition)
+allbp_exp <- gather(all_bp, key = "Gene", value = "Expression", -Sample, -Condition, factor_key = TRUE)
+
 
 ggplot(allbp_exp,aes(x = Gene, y = Expression, fill = Condition)) +
   geom_boxplot(position = position_dodge(width = 0.8), width = 0.3, alpha = 0.8, outlier.shape = NA)  +
