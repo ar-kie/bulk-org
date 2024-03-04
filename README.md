@@ -100,6 +100,10 @@ Analysis for bulk-org project.
 
 [pdf dreamlet](https://github.com/ar-kie/bulk-org/tree/main/docs/dreamlet_plots/02232024_pdf)
 
+03/01/2024: FINAL FINAL REQUESTS!!!
+
+[pdf bulk](https://ar-kie.github.io/bulk-org/docs/03012024_bulk-org-AB-figures_pdf.pdf)
+
 
 All figures are also available as png here:
 
