@@ -1,7 +1,7 @@
 ---
-title: "bulk-org figures (AB) V1.351"
+title: "bulk-org figures (AB) V1.352"
 author: "Raphael Kubler"
-date: "03/01/2024"
+date: "04/15/2024"
 output:
   pdf_document:
     toc: yes
@@ -475,6 +475,51 @@ ComplexHeatmap::Heatmap(DEG.enrich_ifny[!rownames(DEG.enrich_ifny) %in% 'Lipid m
 dotplot(new_IFNy.upregGO, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
 dotplot(new_IFNy.downregGO, split="ONTOLOGY", showCategory=10) + facet_grid(ONTOLOGY~., scale="free")
 
+
+```
+
+
+### Barplots:
+
+```{r GO.ifny.CO_bp, echo = FALSE, fig.height = 7, fig.width = 12, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+new_IFNy.upregGO@result$log_FDR <- -log10(new_IFNy.upregGO@result$qvalue)
+new_IFNy.upregGO_res <- new_IFNy.upregGO@result
+
+new_IFNy.upregGO_res <- new_IFNy.upregGO_res[new_IFNy.upregGO_res$ONTOLOGY %in% 'BP',]
+new_IFNy.upregGO_res <- new_IFNy.upregGO_res[order(new_IFNy.upregGO_res$log_FDR, decreasing = T),]
+
+new_IFNy.upregGO_res$Description <- factor(new_IFNy.upregGO_res$Description, levels=rev(unique(new_IFNy.upregGO_res$Description)))
+
+ggplot(new_IFNy.upregGO_res[1:5,], aes_string(x='Description',y='log_FDR',fill='log_FDR')) + 
+    geom_bar(position='dodge',stat="identity") + 
+    scale_fill_continuous('-log10(q-value)',low="lightyellow3", high="red3",limits = c(0,50)) +
+    ylim(limits = c(0,50)) +
+    coord_flip()+
+    ggtitle('CO - upregulated')+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+#downregulated:
+new_IFNy.downregGO@result$log_FDR <- -log10(new_IFNy.downregGO@result$qvalue)
+new_IFNy.downregGO_res <- new_IFNy.downregGO@result
+
+new_IFNy.downregGO_res <- new_IFNy.downregGO_res[new_IFNy.downregGO_res$ONTOLOGY %in% 'BP',]
+new_IFNy.downregGO_res <- new_IFNy.downregGO_res[order(new_IFNy.downregGO_res$log_FDR, decreasing = T),]
+
+new_IFNy.downregGO_res$Description <- factor(new_IFNy.downregGO_res$Description, levels=rev(unique(new_IFNy.downregGO_res$Description)))
+
+ggplot(new_IFNy.downregGO_res[1:5,], aes_string(x='Description',y='log_FDR',fill='log_FDR')) + 
+    geom_bar(position='dodge',stat="identity") + 
+    scale_fill_continuous('-log10(q-value)',low="lightyellow3", high="red3",limits = c(0,50)) +
+    ylim(limits = c(0,50)) +
+    coord_flip()+
+    ggtitle('CO - upregulated')+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+
+
 ```
 
 
@@ -668,6 +713,49 @@ dotplot(new_coimg_ifny.downregGO, split="ONTOLOGY", showCategory=10) + facet_gri
 
 ```
 
+
+### Barplots:
+
+```{r GO.ifny.COiMg_bp, echo = FALSE, fig.height = 7, fig.width = 12, fig.align = "center", message = FALSE, warning=FALSE, eval=TRUE}
+
+new_coimg_ifny.downregGO@result$log_FDR <- -log10(new_coimg_ifny.downregGO@result$qvalue)
+new_coimg_ifny.downregGO_res <- new_coimg_ifny.downregGO@result
+
+new_coimg_ifny.downregGO_res <- new_coimg_ifny.downregGO_res[new_coimg_ifny.downregGO_res$ONTOLOGY %in% 'BP',]
+new_coimg_ifny.downregGO_res <- new_coimg_ifny.downregGO_res[order(new_coimg_ifny.downregGO_res$log_FDR, decreasing = T),]
+
+new_coimg_ifny.downregGO_res$Description <- factor(new_coimg_ifny.downregGO_res$Description, levels=rev(unique(new_coimg_ifny.downregGO_res$Description)))
+
+ggplot(new_coimg_ifny.downregGO_res[1:5,], aes_string(x='Description',y='log_FDR',fill='log_FDR')) + 
+    geom_bar(position='dodge',stat="identity") + 
+    scale_fill_continuous('-log10(q-value)',low="lightyellow3", high="red3",limits = c(0,50)) +
+    ylim(limits = c(0,50)) +
+    coord_flip()+
+    ggtitle('COiMg - upregulated')+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+#downregulated:
+new_coimg_ifny.upregGO@result$log_FDR <- -log10(new_coimg_ifny.upregGO@result$qvalue)
+new_coimg_ifny.upregGO_res <- new_coimg_ifny.upregGO@result
+
+new_coimg_ifny.upregGO_res <- new_coimg_ifny.upregGO_res[new_coimg_ifny.upregGO_res$ONTOLOGY %in% 'BP',]
+new_coimg_ifny.upregGO_res <- new_coimg_ifny.upregGO_res[order(new_coimg_ifny.upregGO_res$log_FDR, decreasing = T),]
+
+new_coimg_ifny.upregGO_res$Description <- factor(new_coimg_ifny.upregGO_res$Description, levels=rev(unique(new_coimg_ifny.upregGO_res$Description)))
+
+ggplot(new_coimg_ifny.upregGO_res[1:5,], aes_string(x='Description',y='log_FDR',fill='log_FDR')) + 
+    geom_bar(position='dodge',stat="identity") + 
+    scale_fill_continuous('-log10(q-value)',low="lightyellow3", high="red3",limits = c(0,50)) +
+    ylim(limits = c(0,50)) +
+    coord_flip()+
+    ggtitle('COiMg - upregulated')+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+
+
+```
 
 # CO vs COiMg under IFNy
 
@@ -1065,6 +1153,8 @@ rownames(m) <- c('ADHD risk genes (based on GWAS)','Autism spectrum disorder ris
 m <- t(m)
 
 m <- m[,match(order,colnames(m))]
+
+
 #gene set enrichment analysis:
 ndd.enrich <- matrix(nrow=2*length(colnames(m)), ncol=6)
 ndd.rep <- NULL

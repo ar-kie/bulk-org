@@ -104,6 +104,10 @@ Analysis for bulk-org project.
 
 [pdf bulk](https://ar-kie.github.io/bulk-org/docs/03012024_bulk-org-AB-figures_pdf.pdf)
 
+04/15/2024: You know it.
+
+[pdf bulk](https://ar-kie.github.io/bulk-org/docs/04152024_bulk-org-AB-figures_pdf.pdf)
+
 
 All figures are also available as png here:
 
